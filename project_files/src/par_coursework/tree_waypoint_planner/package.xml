@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>tree_waypoint_planner</name>
+  <version>0.0.0</version>
+  <description>Tree approach waypoint planner for orchard harvesting demos.</description>
+  <maintainer email="your.email@student.rmit.edu.au">RMIT AI Innovation Lab</maintainer>
+  <license>RMIT IP - Not for public release</license>
+
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>visualization_msgs</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
