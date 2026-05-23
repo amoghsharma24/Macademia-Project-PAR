@@ -54,8 +54,7 @@ def generate_launch_description():
                 description="Maximum circle radius to detect.",
             ),
             # endregion
-            # region
-            # nodes
+            # region nodes
             Node(
                 package="tree_mapper",
                 executable="tree_mapper_node",
@@ -73,5 +72,6 @@ def generate_launch_description():
                     }
                 ],
             ),
+            # endregion
         ]
     )
