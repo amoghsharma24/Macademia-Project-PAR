@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 import os
 from glob import glob
 
-package_name = "snc_path_tracker"
+package_name = "tree_mapper"
 
 setup(
     name=package_name,
