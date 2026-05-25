@@ -2,6 +2,7 @@ import rclpy
 from rclpy.node import Node
 
 from nav_msgs.msg import Path
+from nav_msgs.msg import OccupancyGrid
 from geometry_msgs.msg import PoseStamped
 
 from ompl import base as ob
@@ -19,18 +20,88 @@ class PlannerNode(Node):
             10
         )
 
-        self.plan_demo_path()
+        self.map_data = None
+
+        self.map_sub = self.create_subscription(
+            OccupancyGrid, 
+            '/map', 
+            self.map_callback,
+            10
+        )
+    
+    def map_callback(self, msg): 
+        self.map_data = msg
+
+        self.get_logger().info(
+            f"Received map with resolution: {self.map_data.info.resolution}"
+        )
+
+        # only plan once
+        if not hasattr(self, 'planned_once'):
+
+            self.planned_once = True
+
+            self.plan_demo_path()
 
     def is_state_valid(self, state):
+
+        if self.map_data is None:
+            return False
+
+        x = state[0]
+        y = state[1]
+
+        info = self.map_data.info
+
+        resolution = info.resolution
+        origin_x = info.origin.position.x
+        origin_y = info.origin.position.y
+        width = info.width
+        height = info.height
+
+        map_x = int((x - origin_x) / resolution)
+        map_y = int((y - origin_y) / resolution)
+
+        # bounds check
+        if map_x < 0 or map_x >= width:
+            return False
+
+        if map_y < 0 or map_y >= height:
+            return False
+
+        index = map_y * width + map_x
+
+        occupancy = self.map_data.data[index]
+
+        # Occupied or unknown
+        if occupancy > 50 or occupancy == -1:
+            return False
+
         return True
 
     def plan_demo_path(self):
 
         space = ob.SE2StateSpace()
 
+        info = self.map_data.info
+
+        resolution = info.resolution
+        width = info.width
+        height = info.height
+
+        origin_x = info.origin.position.x
+        origin_y = info.origin.position.y
+
+        map_width_m = width * resolution
+        map_height_m = height * resolution
+
         bounds = ob.RealVectorBounds(2)
-        bounds.setLow(0)
-        bounds.setHigh(10)
+
+        bounds.setLow(0, origin_x)
+        bounds.setLow(1, origin_y)
+
+        bounds.setHigh(0, origin_x + map_width_m)
+        bounds.setHigh(1, origin_y + map_height_m)
 
         space.setBounds(bounds)
 
@@ -38,12 +109,12 @@ class PlannerNode(Node):
 
         ss.setStateValidityChecker(self.is_state_valid)
 
-        start = space.allocState()
+        start = ob.State(space)
         start.setX(1.0)
         start.setY(1.0)
         start.setYaw(0.0)
 
-        goal = space.allocState()
+        goal = ob.State(space)
         goal.setX(8.0)
         goal.setY(8.0)
         goal.setYaw(0.0)
