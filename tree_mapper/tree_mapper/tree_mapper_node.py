@@ -24,22 +24,23 @@ from geometry_msgs.msg import Pose, PoseArray
 from nav_msgs.msg import OccupancyGrid
 from numpy.typing import NDArray
 from rclpy.node import Node
+from typing import List, Dict, Tuple
 
 
 class treeMapper(Node):
     def __init__(self) -> None:
-        super().__init__("path_tracker_node")
+        super().__init__("tree_mapper_node")
 
         self.declare_parameters(
             namespace="",
             parameters=[
-                ("image_path", None),
+                ("image_path", "."),
                 ("hough.dp", 1.0),
-                ("hough.min_dist", 20.0),
-                ("hough.param1", 10.0),
-                ("hough.param2", 10.0),
-                ("hough.min_radius", 6),
-                ("hough.max_radius", 9),
+                ("hough.min_dist", 1.0),
+                ("hough.param1", 1.0),
+                ("hough.param2", 1.0),
+                ("hough.min_radius", 1.0),
+                ("hough.max_radius", 1.0),
             ],
         )
 
@@ -57,7 +58,7 @@ class treeMapper(Node):
         # self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
 
         # Timers
-        self.timer = self.create_timer(0.5, self.generate_from_most_recent)
+        self.timer = self.create_timer(2, self.generate_from_topic)
 
         # Parameters
         self.map_path = self.get_parameter("image_path").value
@@ -79,7 +80,7 @@ class treeMapper(Node):
         # make it RGB so placed trees are seen easier.
         return img
 
-    def load_map_yaml(self, yaml_path: str) -> dict[str, any]:
+    def load_map_yaml(self, yaml_path: str) -> Dict[str, any]:
         """
         Load a ROS2/Nav2 map YAML file.
 
@@ -118,22 +119,17 @@ class treeMapper(Node):
         self,
         img: NDArray[np.uint8],
     ) -> NDArray[np.float32] | None:
-        dp = self.get_parameter("hough.dp").value
-        min_dist = self.get_parameter("hough.min_dist").value
-        param1 = self.get_parameter("hough.param1").value
-        param2 = self.get_parameter("hough.param2").value
-        min_radius = self.get_parameter("hough.min_radius").value
-        max_radius = self.get_parameter("hough.max_radius").value
+        param_dict = self.get_hough_parameters()
 
         circles = cv2.HoughCircles(
             img,
             cv2.HOUGH_GRADIENT,
-            dp=dp,
-            minDist=min_dist,
-            param1=param1,
-            param2=param2,
-            minRadius=min_radius,
-            maxRadius=max_radius,
+            dp=param_dict["dp"],
+            minDist=param_dict["min_dist"],
+            param1=param_dict["param1"],
+            param2=param_dict["param2"],
+            minRadius=param_dict["min_radius"],
+            maxRadius=param_dict["max_radius"],
         )
         return circles
 
@@ -159,10 +155,16 @@ class treeMapper(Node):
     ) -> None:
         image_path = img_path + "/detected-trees.jpeg"
         cv2.imwrite(image_path, img)
+        self.get_logger().info(f"image saved: {image_path}")
 
     # endregion
 
     # region conversion methods
+    def convert_parameters_to_pixels(self, parameters: list):
+        newParams = []
+        for p in parameters:
+            newParams.append(int(p * self.most_recent_resolution))
+        return newParams
 
     def convert_grid_to_image(
         self,
@@ -199,12 +201,12 @@ class treeMapper(Node):
         # Store image for later use
         return img
 
-    def transform_circles(
+    def convert_circles_to_map(
         self,
-        origin: dict[str, float],
+        origin: Dict[str, float],
         resolution: float,
         circles: NDArray[np.float32],
-    ) -> list[tuple[float, float, float]]:
+    ) -> List[Tuple[float, float, float]]:
         # 1. convert to correct resolution
         # 2. convert to map frame
         # - is positive x forward? is positive y left?
@@ -220,12 +222,13 @@ class treeMapper(Node):
                 r_meters = r
                 circles_translated.append((x_meters, y_meters, r_meters))
 
+        # self.get_logger().info(f"trees transformed: {circles_translated}")
         return circles_translated
 
     def get_origin(
         self,
         msg: OccupancyGrid,
-    ) -> dict[str, float]:
+    ) -> Dict[str, float]:
         info = msg.info
 
         metadata = {
@@ -250,7 +253,9 @@ class treeMapper(Node):
         circles = self.detect_circles(map_img)
 
         if circles is None:
+            self.get_logger().info("no trees detected")
             return None
+        self.get_logger().info(f"trees detected: {len(circles[0])}")
 
         final_img = self.draw_circles(output, circles)
 
@@ -274,16 +279,21 @@ class treeMapper(Node):
             return
 
         map_img = self.filter_map(self.most_recent_map)
+        self.get_logger().info("1/4 map image gotten")
 
         circles = self.generate_trees(map_img)
+        self.get_logger().info("2/4 circles gotten")
 
         if circles is None:
             return
 
-        transformed_circles = self.transform_circles(
+        transformed_circles = self.convert_circles_to_map(
             self.most_recent_origin, self.most_recent_resolution, circles
         )
+        self.get_logger().info("3/4 circles transformed")
+
         self.publish_circles(transformed_circles, self.most_recent_time)
+        self.get_logger().info("4/4 circles published")
 
     # endregion
     # region subscribers
@@ -297,26 +307,46 @@ class treeMapper(Node):
         self.most_recent_time = msg.info.map_load_time
 
     # endregion
+
+    # region value grabbers
+    def get_hough_parameters(self):
+        distance_params = [
+            self.get_parameter("hough.min_dist").value,
+            self.get_parameter("hough.min_radius").value,
+            self.get_parameter("hough.max_radius").value,
+        ]
+
+        scaled_params = self.convert_parameters_to_pixels(distance_params)
+
+        params_dict = {
+            "dp": self.get_parameter("hough.dp").value,
+            "min_dist": scaled_params[0],
+            "param1": self.get_parameter("hough.param1").value,
+            "param2": self.get_parameter("hough.param2").value,
+            "min_radius": scaled_params[1],
+            "max_radius": scaled_params[2],
+        }
+        return params_dict
+
+    # endregion
     # region publishers
     def publish_circles(
         self,
-        circles: list[tuple[float, float, float]],
+        circles: List[Tuple[float, float, float]],
         time: Time,
     ) -> None:
         trees = PoseArray()
         trees.header.frame_id = "map"
         trees.header.stamp = time
-        # Infinite lifetime
-        trees.lifetime.sec = 0
 
         # Create the poses
         detected_trees = []
         for x, y, r in circles:
             pose = Pose()
 
-            pose.position.x = x
-            pose.position.y = y
-            pose.position.z = 0
+            pose.position.x = float(x)
+            pose.position.y = float(y)
+            pose.position.z = 0.0
 
             pose.orientation.x = 0.0
             pose.orientation.y = 0.0

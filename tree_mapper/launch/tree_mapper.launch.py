@@ -10,14 +10,12 @@ def generate_launch_description():
         [
             # region
             # launch arguments
-            SetEnvironmentVariable("TEST_1", "1"),
-            DeclareLaunchArgument(
-                "TEST_LAUNCH", default_value=test, description="blah blah."
-            ),
+            SetEnvironmentVariable("TEST", "1"),
             DeclareLaunchArgument(
                 "maps_path",
                 default_value=[
-                    "/ros2_ws/src/par_coursework/tree_mapper/tree_mapper/maps",
+                    # "/ros2_ws/src/par_coursework/tree_mapper/maps",
+                    "./src/par_coursework/tree_mapper/maps",
                     # use when running in vm.
                     # "/humble_workspace/src/par_coursework/objects_example",
                 ],
@@ -30,8 +28,8 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 "hough_min_dist",
-                default_value="20.0",
-                description="Minimum distance between detected circle centers.",
+                default_value=".2",
+                description="Minimum distance between detected circle centers (meters)",
             ),
             DeclareLaunchArgument(
                 "hough_param1",
@@ -45,13 +43,13 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 "hough_min_radius",
-                default_value="6",
-                description="Minimum circle radius to detect.",
+                default_value="0.05",
+                description="Minimum circle radius to detect (meters)",
             ),
             DeclareLaunchArgument(
                 "hough_max_radius",
-                default_value="9",
-                description="Maximum circle radius to detect.",
+                default_value="0.09",
+                description="Maximum circle radius to detect (meters)",
             ),
             # endregion
             # region nodes
