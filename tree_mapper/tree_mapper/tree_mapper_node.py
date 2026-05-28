@@ -35,12 +35,12 @@ class treeMapper(Node):
             namespace="",
             parameters=[
                 ("image_path", "."),
-                ("hough.dp", 1.0),
-                ("hough.min_dist", 1.0),
-                ("hough.param1", 1.0),
-                ("hough.param2", 1.0),
-                ("hough.min_radius", 1.0),
-                ("hough.max_radius", 1.0),
+                # ("hough.dp", 1.0),
+                # ("hough.min_dist", 1.0),
+                # ("hough.param1", 1.0),
+                # ("hough.param2", 1.0),
+                # ("hough.min_radius", 1.0),
+                # ("hough.max_radius", 1.0),
             ],
         )
 
@@ -58,7 +58,7 @@ class treeMapper(Node):
         # self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
 
         # Timers
-        self.timer = self.create_timer(2, self.generate_from_topic)
+        self.timer = self.create_timer(10, self.generate_from_topic)
 
         # Parameters
         self.map_path = self.get_parameter("image_path").value
@@ -113,25 +113,43 @@ class treeMapper(Node):
         self,
         parsed_map: NDArray[np.uint8],
     ) -> NDArray[np.uint8]:
-        return parsed_map
+        ret, thresh = cv2.threshold(parsed_map, 64, 100, cv2.THRESH_BINARY_INV)
+        return thresh
 
-    def detect_circles(
+    def detect_contours(
         self,
         img: NDArray[np.uint8],
     ) -> NDArray[np.float32] | None:
-        param_dict = self.get_hough_parameters()
-
-        circles = cv2.HoughCircles(
-            img,
-            cv2.HOUGH_GRADIENT,
-            dp=param_dict["dp"],
-            minDist=param_dict["min_dist"],
-            param1=param_dict["param1"],
-            param2=param_dict["param2"],
-            minRadius=param_dict["min_radius"],
-            maxRadius=param_dict["max_radius"],
+        contours, hierarchy = cv2.findContours(
+            img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
         )
-        return circles
+
+        return contours
+
+    def filter_contours(
+        self,
+        contours: NDArray[np.float32],
+    ) -> NDArray[np.float32] | None:
+        trees = []
+        for c in contours:
+            peri = cv2.arcLength(c, True)
+            approx = cv2.approxPolyDP(c, peri, True)
+            area = cv2.contourArea(c)
+
+            (x, y), radius = cv2.minEnclosingCircle(c)
+            # filtered_cnts.append((peri, len(approx), area, x, y, radius))
+
+            if (
+                len(approx) > 0
+                and
+                # area = 0 only for single points.
+                area > 0
+                and area < 5
+                and radius < 3
+                and peri > 2
+                and peri < 10
+            ):
+                trees.append((x, y, radius))
 
     def draw_circles(
         self,
@@ -250,17 +268,24 @@ class treeMapper(Node):
 
         map_img = self.filter_map(map_image)
 
-        circles = self.detect_circles(map_img)
+        contours = self.detect_contours(map_img)
 
-        if circles is None:
+        if contours is None:
             self.get_logger().info("no trees detected")
             return None
-        self.get_logger().info(f"trees detected: {len(circles[0])}")
 
-        final_img = self.draw_circles(output, circles)
+        trees = self.filter_contours(contours)
+        if trees is None:
+            self.get_logger().info("all trees were filtered out")
+            return None
+
+        self.get_logger().info(f"trees detected: {len(trees[0])}")
+
+        final_img = self.draw_circles(output, contours)
 
         self.save_image(self.map_path, final_img)
-        return circles
+        # for drawing function.
+        return [trees]
 
     # endregion
     # region control methods

@@ -21,36 +21,36 @@ def generate_launch_description():
                 ],
                 description="Directory containing maps to detect trees for.",
             ),
-            DeclareLaunchArgument(
-                "hough_dp",
-                default_value="1.0",
-                description="Inverse ratio of accumulator resolution to image resolution.",
-            ),
-            DeclareLaunchArgument(
-                "hough_min_dist",
-                default_value=".2",
-                description="Minimum distance between detected circle centers (meters)",
-            ),
-            DeclareLaunchArgument(
-                "hough_param1",
-                default_value="10.0",
-                description="Higher threshold for the internal Canny edge detector.",
-            ),
-            DeclareLaunchArgument(
-                "hough_param2",
-                default_value="10.0",
-                description="Accumulator threshold for circle detection.",
-            ),
-            DeclareLaunchArgument(
-                "hough_min_radius",
-                default_value="0.05",
-                description="Minimum circle radius to detect (meters)",
-            ),
-            DeclareLaunchArgument(
-                "hough_max_radius",
-                default_value="0.09",
-                description="Maximum circle radius to detect (meters)",
-            ),
+            # DeclareLaunchArgument(
+            #     "hough_dp",
+            #     default_value="1.0",
+            #     description="Inverse ratio of accumulator resolution to image resolution.",
+            # ),
+            # DeclareLaunchArgument(
+            #     "hough_min_dist",
+            #     default_value=".2",
+            #     description="Minimum distance between detected circle centers (meters)",
+            # ),
+            # DeclareLaunchArgument(
+            #     "hough_param1",
+            #     default_value="10.0",
+            #     description="Higher threshold for the internal Canny edge detector.",
+            # ),
+            # DeclareLaunchArgument(
+            #     "hough_param2",
+            #     default_value="10.0",
+            #     description="Accumulator threshold for circle detection.",
+            # ),
+            # DeclareLaunchArgument(
+            #     "hough_min_radius",
+            #     default_value="0.05",
+            #     description="Minimum circle radius to detect (meters)",
+            # ),
+            # DeclareLaunchArgument(
+            #     "hough_max_radius",
+            #     default_value="0.09",
+            #     description="Maximum circle radius to detect (meters)",
+            # ),
             # endregion
             # region nodes
             Node(
@@ -61,12 +61,12 @@ def generate_launch_description():
                 parameters=[
                     {
                         "image_path": LaunchConfiguration("maps_path"),
-                        "hough.dp": LaunchConfiguration("hough_dp"),
-                        "hough.min_dist": LaunchConfiguration("hough_min_dist"),
-                        "hough.param1": LaunchConfiguration("hough_param1"),
-                        "hough.param2": LaunchConfiguration("hough_param2"),
-                        "hough.min_radius": LaunchConfiguration("hough_min_radius"),
-                        "hough.max_radius": LaunchConfiguration("hough_max_radius"),
+                        # "hough.dp": LaunchConfiguration("hough_dp"),
+                        # "hough.min_dist": LaunchConfiguration("hough_min_dist"),
+                        # "hough.param1": LaunchConfiguration("hough_param1"),
+                        # "hough.param2": LaunchConfiguration("hough_param2"),
+                        # "hough.min_radius": LaunchConfiguration("hough_min_radius"),
+                        # "hough.max_radius": LaunchConfiguration("hough_max_radius"),
                     }
                 ],
             ),
