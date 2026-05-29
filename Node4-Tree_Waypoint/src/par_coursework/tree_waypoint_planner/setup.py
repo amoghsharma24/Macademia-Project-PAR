@@ -26,6 +26,7 @@ setup(
         'console_scripts': [
             'fake_tree_publisher_node = tree_waypoint_planner.fake_tree_publisher_node:main',
             'tree_waypoint_planner_node = tree_waypoint_planner.tree_waypoint_planner_node:main',
+            'nav2_waypoint_sender_node = tree_waypoint_planner.nav2_waypoint_sender_node:main',
         ],
     },
 )
