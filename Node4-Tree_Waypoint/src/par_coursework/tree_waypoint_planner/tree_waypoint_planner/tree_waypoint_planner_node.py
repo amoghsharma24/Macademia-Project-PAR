@@ -12,10 +12,13 @@ class TreeWaypointPlanner(Node):
     def __init__(self):
         super().__init__('tree_waypoint_planner')
 
-        self.declare_parameter('frame_id', 'map')
+        self.declare_parameter('frame_id', 'odom')
         self.declare_parameter('use_hardcoded_trees', True)
+        self.declare_parameter('waypoint_mode', 'towards_centerline')
         self.declare_parameter('waypoint_offset_x', 0.0)
         self.declare_parameter('waypoint_offset_y', -0.6)
+        self.declare_parameter('centreline_y', 0.0)
+        self.declare_parameter('approach_distance', 0.9)
         self.declare_parameter('tree_marker_radius', 0.25)
         self.declare_parameter('tree_marker_height', 0.8)
 
@@ -59,12 +62,14 @@ class TreeWaypointPlanner(Node):
 
     def create_hardcoded_tree_poses(self):
         tree_positions = [
-            (0.0, 0.0),
-            (1.5, 0.0),
-            (3.0, 0.0),
-            (0.0, 2.0),
-            (1.5, 2.0),
-            (3.0, 2.0),
+            (1.0, 1.2),
+            (2.0, 1.2),
+            (3.0, 1.2),
+            (4.0, 1.2),
+            (1.0, -1.2),
+            (2.0, -1.2),
+            (3.0, -1.2),
+            (4.0, -1.2),
         ]
 
         tree_poses = []
@@ -79,14 +84,29 @@ class TreeWaypointPlanner(Node):
         return tree_poses
 
     def create_waypoint_poses(self, tree_poses):
+        waypoint_mode = self.get_parameter('waypoint_mode').value
         offset_x = self.get_parameter('waypoint_offset_x').value
         offset_y = self.get_parameter('waypoint_offset_y').value
+        centreline_y = self.get_parameter('centreline_y').value
+        approach_distance = self.get_parameter('approach_distance').value
+        centreline_margin = 0.05
         waypoint_poses = []
 
         for tree_pose in tree_poses:
             waypoint_pose = Pose()
-            waypoint_pose.position.x = tree_pose.position.x + offset_x
-            waypoint_pose.position.y = tree_pose.position.y + offset_y
+            if waypoint_mode == 'fixed_offset':
+                waypoint_pose.position.x = tree_pose.position.x + offset_x
+                waypoint_pose.position.y = tree_pose.position.y + offset_y
+            else:
+                waypoint_pose.position.x = tree_pose.position.x
+                if tree_pose.position.y > centreline_y:
+                    desired_y = tree_pose.position.y - approach_distance
+                    max_cross_y = centreline_y + centreline_margin
+                    waypoint_pose.position.y = max(desired_y, max_cross_y)
+                else:
+                    desired_y = tree_pose.position.y + approach_distance
+                    min_cross_y = centreline_y - centreline_margin
+                    waypoint_pose.position.y = min(desired_y, min_cross_y)
             waypoint_pose.position.z = 0.0
 
             yaw = math.atan2(
@@ -157,7 +177,7 @@ class TreeWaypointPlanner(Node):
             marker.action = Marker.ADD
             marker.pose = waypoint_pose
             marker.pose.position.z = 0.05
-            marker.scale.x = 0.45
+            marker.scale.x = 0.25
             marker.scale.y = 0.08
             marker.scale.z = 0.08
             marker.color.r = 1.0

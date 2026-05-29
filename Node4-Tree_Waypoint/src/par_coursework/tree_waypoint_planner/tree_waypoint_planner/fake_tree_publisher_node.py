@@ -9,7 +9,7 @@ class FakeTreePublisher(Node):
     def __init__(self):
         super().__init__('fake_tree_publisher')
 
-        self.declare_parameter('frame_id', 'map')
+        self.declare_parameter('frame_id', 'odom')
         self.publisher = self.create_publisher(PoseArray, '/detected_trees', 10)
         self.create_timer(1.0, self.publish_fake_trees)
 
@@ -25,14 +25,14 @@ class FakeTreePublisher(Node):
 
     def create_fake_tree_poses(self):
         tree_positions = [
-            (0.5, 1.0),
-            (1.5, 1.0),
-            (2.5, 1.0),
-            (3.5, 1.0),
-            (0.5, -1.0),
-            (1.5, -1.0),
-            (2.5, -1.0),
-            (3.5, -1.0),
+            (1.0, 1.2),
+            (2.0, 1.2),
+            (3.0, 1.2),
+            (4.0, 1.2),
+            (1.0, -1.2),
+            (2.0, -1.2),
+            (3.0, -1.2),
+            (4.0, -1.2),
         ]
 
         tree_poses = []
