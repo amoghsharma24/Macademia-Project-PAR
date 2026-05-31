@@ -25,6 +25,15 @@ from nav_msgs.msg import OccupancyGrid
 from numpy.typing import NDArray
 from rclpy.node import Node
 from typing import List, Dict, Tuple
+from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy, HistoryPolicy
+
+
+map_qos = QoSProfile(
+    reliability=ReliabilityPolicy.RELIABLE,
+    durability=DurabilityPolicy.TRANSIENT_LOCAL,
+    history=HistoryPolicy.KEEP_LAST,
+    depth=1,
+)
 
 
 class treeMapper(Node):
@@ -67,7 +76,9 @@ class treeMapper(Node):
         # self.waypoint_client = ActionClient(self, FollowWaypoints, "/follow_waypoints")
 
         # Subscriptions
-        self.create_subscription(OccupancyGrid, "/map", self.parse_occupancy_msg, 10)
+        self.create_subscription(
+            OccupancyGrid, "/map", self.parse_occupancy_msg, map_qos
+        )
 
         # Wait for Nav2
         # self.get_logger().info("Waiting for Nav2 waypoint server...")
@@ -113,7 +124,8 @@ class treeMapper(Node):
         self,
         parsed_map: NDArray[np.uint8],
     ) -> NDArray[np.uint8]:
-        ret, thresh = cv2.threshold(parsed_map, 64, 100, cv2.THRESH_BINARY_INV)
+        # one less than grey
+        ret, thresh = cv2.threshold(parsed_map, 126, 255, cv2.THRESH_BINARY_INV)
         return thresh
 
     def detect_contours(
@@ -209,9 +221,9 @@ class treeMapper(Node):
         # unknown   -> 127 (gray)
         img = np.zeros((height, width), dtype=np.uint8)
 
-        img[grid <= 0] = 255
-        img[grid == 100] = 0
-        img[grid == -1] = 127
+        img[grid <= 19.6] = 255
+        img[grid >= 65] = 0
+        # img[grid == -1] = 127
 
         # Flip vertically so map orientation matches RViz/world coordinates
         # img = cv2.flip(img, 0)
