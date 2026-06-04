@@ -95,6 +95,14 @@ class PlannerNode(Node):
         map_width_m = width * resolution
         map_height_m = height * resolution
 
+        self.get_logger().info(
+            f"Map origin: ({origin_x}, {origin_y})"
+        )
+
+        self.get_logger().info(
+            f"Map size: {map_width_m} x {map_height_m}"
+        )
+
         bounds = ob.RealVectorBounds(2)
 
         bounds.setLow(0, origin_x)
@@ -110,14 +118,24 @@ class PlannerNode(Node):
         ss.setStateValidityChecker(self.is_state_valid)
 
         start = space.allocState()
-        start.setX(1.0)
-        start.setY(1.0)
+        start.setX(0.0)
+        start.setY(0.0)
         start.setYaw(0.0)
 
         goal = space.allocState()
-        goal.setX(8.0)
-        goal.setY(8.0)
+        goal.setX(0.0)
+        goal.setY(1.0)
         goal.setYaw(0.0)
+
+        print(
+            "start valid:",
+            self.is_state_valid(start)
+        )
+
+        print(
+            "goal valid:",
+            self.is_state_valid(goal)
+        )
 
         ss.setStartAndGoalStates(start, goal)
 
