@@ -48,8 +48,8 @@ class PlannerNode(Node):
         if self.map_data is None:
             return False
 
-        x = state[0]
-        y = state[1]
+        x = state.getX()
+        y = state.getY()
 
         info = self.map_data.info
 
@@ -109,12 +109,12 @@ class PlannerNode(Node):
 
         ss.setStateValidityChecker(self.is_state_valid)
 
-        start = ob.State(space)
+        start = space.allocState()
         start.setX(1.0)
         start.setY(1.0)
         start.setYaw(0.0)
 
-        goal = ob.State(space)
+        goal = space.allocState()
         goal.setX(8.0)
         goal.setY(8.0)
         goal.setYaw(0.0)
@@ -141,6 +141,9 @@ class PlannerNode(Node):
             for i in range(solution.getStateCount()):
 
                 state = solution.getState(i)
+
+                print(type(state))
+                print(dir(state))                
 
                 pose = PoseStamped()
 
