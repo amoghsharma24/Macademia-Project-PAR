@@ -174,8 +174,10 @@ class TreeWaypointPlanner(Node):
         marker.id = 0
         marker.type = Marker.ARROW
         marker.action = Marker.ADD
-        marker.pose = selected_pose
+        marker.pose.position.x = selected_pose.position.x
+        marker.pose.position.y = selected_pose.position.y
         marker.pose.position.z = 0.08
+        marker.pose.orientation = selected_pose.orientation
         marker.scale.x = 0.6
         marker.scale.y = 0.14
         marker.scale.z = 0.14
@@ -243,8 +245,10 @@ class TreeWaypointPlanner(Node):
             marker.id = marker_id
             marker.type = Marker.ARROW
             marker.action = Marker.ADD
-            marker.pose = waypoint_pose
+            marker.pose.position.x = waypoint_pose.position.x
+            marker.pose.position.y = waypoint_pose.position.y
             marker.pose.position.z = 0.05
+            marker.pose.orientation = waypoint_pose.orientation
             marker.scale.x = 0.25
             marker.scale.y = 0.08
             marker.scale.z = 0.08

@@ -19,12 +19,12 @@ setup(
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='RMIT AI Innovation Lab',
-    maintainer_email='your.email@student.rmit.edu.au',
     description='Tree approach waypoint planner for orchard harvesting demos.',
     license='RMIT IP - Not for public release',
     entry_points={
         'console_scripts': [
             'fake_tree_publisher_node = tree_waypoint_planner.fake_tree_publisher_node:main',
+            'tree_memory_node = tree_waypoint_planner.tree_memory_node:main',
             'tree_waypoint_planner_node = tree_waypoint_planner.tree_waypoint_planner_node:main',
             'nav2_waypoint_sender_node = tree_waypoint_planner.nav2_waypoint_sender_node:main',
         ],
