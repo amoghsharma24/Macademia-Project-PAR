@@ -5,7 +5,7 @@ from rclpy.node import Node
 from geometry_msgs.msg import TwistStamped
 from nav_msgs.msg import Odometry
 from visualization_msgs.msg import Marker
-from std_msgs.msg import Empty
+from std_msgs.msg import Float32MultiArray
 
 
 class SpiralController(Node):
@@ -16,7 +16,8 @@ class SpiralController(Node):
         self.declare_parameter('center_y', 0.0)
         self.declare_parameter('min_radius', 0.1)
         self.declare_parameter('max_radius', 4.0)
-        self.declare_parameter('loop_spacing', 0.3)
+        self.declare_parameter('loop_spacing', 1.0)
+        self.declare_parameter('robot_width', 0.233)
         self.declare_parameter('linear_speed', 0.125)
         self.declare_parameter('kp_heading', 1.5)
 
@@ -25,6 +26,7 @@ class SpiralController(Node):
         self.min_radius = self.get_parameter('min_radius').value
         self.max_radius = self.get_parameter('max_radius').value
         self.loop_spacing = self.get_parameter('loop_spacing').value
+        self.robot_width = self.get_parameter('robot_width').value
         self.linear_speed = self.get_parameter('linear_speed').value
         self.kp_heading = self.get_parameter('kp_heading').value
 
@@ -39,10 +41,11 @@ class SpiralController(Node):
         )
 
         self.started = False
+        self.finished = False
 
         self.start_sub = self.create_subscription(
-            Empty,
-            '/trigger_start',
+            Float32MultiArray,
+            '/start_spiral',
             self.start_callback,
             10
         )
@@ -61,7 +64,7 @@ class SpiralController(Node):
             name='centre_point'
         )
 
-        self.k = self.loop_spacing / (2.0 * math.pi)
+        self.k = self.spiral_growth_rate()
 
         self.theta = 0.0
         self.current_x = None
@@ -82,17 +85,15 @@ class SpiralController(Node):
         radius = self.min_radius + self.k * self.theta
 
         if radius > self.max_radius:
-            self.stop_robot()
-            self.get_logger().info('Finished spiral path')
+            if not self.finished:
+                self.finished = True
+                self.started = False
+                self.stop_robot()
+                self.get_logger().info('Finished spiral path')
             return
 
         target_x = self.center_x + radius * math.cos(self.theta)
         target_y = self.center_y + radius * math.sin(self.theta)
-
-        self.get_logger().info(
-            f'Target point: x={target_x:.3f}, y={target_y:.3f}, '
-            f'radius={radius:.3f}, theta={self.theta:.3f}'
-        )
 
         self.publish_marker(0, self.center_x, self.center_y, 0.0, 1.0, 0.0, 'centre_point')
         self.publish_marker(1, target_x, target_y, 1.0, 0.0, 0.0, 'target_point')
@@ -121,9 +122,13 @@ class SpiralController(Node):
         cmd.twist.angular.z = max(min(cmd.twist.angular.z, 0.4), -0.4)
 
         self.get_logger().info(
-            f'Pose: x={self.current_x:.3f}, y={self.current_y:.3f}, yaw={self.current_yaw:.3f} | '
+            f'Target: x={target_x:.3f}, y={target_y:.3f}, radius={radius:.3f}, '
+            f'theta={self.theta:.3f} | '
+            f'Pose: x={self.current_x:.3f}, y={self.current_y:.3f}, '
+            f'yaw={self.current_yaw:.3f} | '
             f'Heading error={heading_error:.3f}, distance={distance_error:.3f}, '
-            f'linear={cmd.twist.linear.x:.3f}, angular={cmd.twist.angular.z:.3f}'
+            f'linear={cmd.twist.linear.x:.3f}, angular={cmd.twist.angular.z:.3f}',
+            throttle_duration_sec=1.0
         )
 
         self.cmd_pub.publish(cmd)
@@ -169,14 +174,55 @@ class SpiralController(Node):
             self.get_logger().warn('Start trigger ignored: odometry not available yet')
             return
 
+        if len(msg.data) != 5:
+            self.get_logger().warn(
+                'Start trigger ignored: expected Float32MultiArray data '
+                '[center_x, center_y, min_radius, max_radius, loop_spacing_widths]'
+            )
+            return
+
+        center_x, center_y, min_radius, max_radius, loop_spacing = msg.data
+
+        if min_radius < 0.0:
+            self.get_logger().warn('Start trigger ignored: min_radius must be >= 0.0')
+            return
+
+        if max_radius <= min_radius:
+            self.get_logger().warn('Start trigger ignored: max_radius must be greater than min_radius')
+            return
+
+        if loop_spacing <= 0.0:
+            self.get_logger().warn('Start trigger ignored: loop_spacing_widths must be > 0.0')
+            return
+
+        self.center_x = float(center_x)
+        self.center_y = float(center_y)
+        self.min_radius = float(min_radius)
+        self.max_radius = float(max_radius)
+        self.loop_spacing = float(loop_spacing)
+        self.k = self.spiral_growth_rate()
+
         self.started = True
+        self.finished = False
         self.theta = 0.0
 
         self.get_logger().info('Spiral movement started')
         self.get_logger().info(
+            f'Spiral settings from start message: centre x={self.center_x:.3f}, '
+            f'y={self.center_y:.3f}, min_radius={self.min_radius:.3f}, '
+            f'max_radius={self.max_radius:.3f}, loop_spacing={self.loop_spacing:.3f} '
+            f'robot widths ({self.loop_spacing_metres():.3f} m)'
+        )
+        self.get_logger().info(
             f'Start trigger received at robot pose: '
             f'x={self.current_x:.3f}, y={self.current_y:.3f}, yaw={self.current_yaw:.3f}'
         )
+
+    def loop_spacing_metres(self):
+        return self.loop_spacing * self.robot_width
+
+    def spiral_growth_rate(self):
+        return self.loop_spacing_metres() / (2.0 * math.pi)
 
     @staticmethod
     def quaternion_to_yaw(q):
