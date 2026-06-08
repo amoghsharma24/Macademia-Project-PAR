@@ -35,6 +35,7 @@ class PlannerNode(Node):
         self.goal_y = None
 
         self.plan_requested = False
+        self.map_received = False
 
         self.map_sub = self.create_subscription(
             OccupancyGrid, 
@@ -98,6 +99,8 @@ class PlannerNode(Node):
     def map_callback(self, msg): 
         self.map_data = msg
 
+        self.map_received = True
+
         self.get_logger().info(
             f"Received map with resolution: {self.map_data.info.resolution}"
         )
@@ -128,7 +131,8 @@ class PlannerNode(Node):
 
         self.plan_requested = True  
 
-        self.try_plan()
+        if not hasattr(self, 'map_received'):
+            self.try_plan()
 
     def is_state_valid(self, state):
 
