@@ -261,6 +261,18 @@ class PlannerNode(Node):
 
         else:
             self.get_logger().warn('No path found')
+        
+        # resetting qualities
+        self.map_data = None
+
+        self.current_x = None
+        self.current_y = None
+
+        self.goal_x = None
+        self.goal_y = None
+
+        self.plan_requested = False
+        self.map_received = False
 
     def publish_path_markers(self, solution):
 
