@@ -96,22 +96,14 @@ class PlannerNode(Node):
 
         self.plan_demo_path()
     
-    def map_callback(self, msg): 
+    def map_callback(self, msg):
         self.map_data = msg
 
-        self.map_received = True
-
-        self.get_logger().info(
-            f"Received map with resolution: {self.map_data.info.resolution}"
-        )
-
-        self.try_plan()
-        # # only plan once
-        # if not hasattr(self, 'planned_once'):
-
-        #     self.planned_once = True
-
-        #     self.try_plan()
+        if not self.map_received:
+            self.get_logger().info(
+                f"Received first map with resolution: {msg.info.resolution}"
+            )
+            self.map_received = True
     
     def odom_callback(self, msg): 
         self.current_x = msg.pose.pose.position.x
@@ -126,13 +118,12 @@ class PlannerNode(Node):
         self.goal_x = msg.pose.position.x
         self.goal_y = msg.pose.position.y
 
-        q = msg.pose.pose.orientation
+        q = msg.pose.orientation
         self.goal_yaw = self.quaternion_to_yaw(q)
 
         self.plan_requested = True  
 
-        if not hasattr(self, 'map_received'):
-            self.try_plan()
+        self.try_plan()
 
     def is_state_valid(self, state):
 
