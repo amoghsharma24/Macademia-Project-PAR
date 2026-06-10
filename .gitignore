@@ -13,3 +13,16 @@ __pycache__/
 *.autosave
 *~
 .#*
+
+# Python-generated files
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# python versioning
+.python-version*
+pyproject.toml*
+uv*
