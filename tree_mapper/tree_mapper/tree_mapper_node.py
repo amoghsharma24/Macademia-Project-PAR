@@ -15,6 +15,7 @@ from numpy.typing import NDArray
 from rclpy.node import Node
 from typing import List, Dict, Tuple
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy, HistoryPolicy
+from std.msg import Empty
 
 
 map_qos = QoSProfile(
@@ -36,6 +37,8 @@ class treeMapper(Node):
                 ("image_path", "."),
                 ("max_radius", 1.0),
                 ("min_radius", 1.0),
+                ("free_threshold", 1),
+                ("occupied_threshold", 1),
             ],
         )
 
@@ -45,17 +48,18 @@ class treeMapper(Node):
         self.most_recent_resolution = None
         self.most_recent_time = None
         self.parameters = None
+        self.started = False
 
         # Publishers
         self.tree_publisher = self.create_publisher(PoseArray, "/trees", 10)
-        self.single_tree_publisher = self.create_publisher(Pose, "/tree", 1)
+        # self.single_tree_publisher = self.create_publisher(Pose, "/tree", 1)
 
         # TF
         # self.tf_buffer = tf2_ros.Buffer()
         # self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
 
         # Timers
-        self.timer = self.create_timer(10, self.generate_from_topic)
+        # self.timer = self.create_timer(10, self.generate_from_topic)
 
         # Parameters
         self.map_path = self.get_parameter("image_path").value
@@ -63,6 +67,10 @@ class treeMapper(Node):
         # Subscriptions
         self.create_subscription(
             OccupancyGrid, "/map", self.parse_occupancy_msg, map_qos
+        )
+
+        self.create_subscription(
+            Empty, "/tree_generator_start", self.run_generation, 10
         )
 
     # region main functions
@@ -210,8 +218,15 @@ class treeMapper(Node):
 
     # endregion
     # region control methods
+    def run_generation(self) -> None:
+        self.started = True
+        self.get_logger().info("tree generation request recieved.")
+        self.generate_from_topic(self)
 
     def generate_from_topic(self) -> None:
+        if not self.started:
+            return
+
         if (
             self.most_recent_map is None
             or self.most_recent_origin is None
@@ -241,6 +256,8 @@ class treeMapper(Node):
         self,
         msg: OccupancyGrid,
     ) -> None:
+        if not self.started:
+            return
         self.most_recent_origin = self.get_origin(msg)
         self.most_recent_map = self.convert_grid_to_image(msg)
         self.most_recent_resolution = msg.info.resolution
@@ -263,6 +280,8 @@ class treeMapper(Node):
         params_dict = {
             "min_radius": scaled_params[0],
             "max_radius": scaled_params[1],
+            "free_threshold": self.get_parameter("free_threshold").value,
+            "occupied_threshold": self.get_parameter("free_threshold").value,
         }
         return params_dict
 
