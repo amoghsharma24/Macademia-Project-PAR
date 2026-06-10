@@ -6,6 +6,7 @@ import rclpy
 from geometry_msgs.msg import Point
 from nav_msgs.msg import OccupancyGrid
 from rclpy.node import Node
+from std_msgs.msg import Empty, String
 from visualization_msgs.msg import Marker
 
 
@@ -22,10 +23,12 @@ class FakeBoundaryFilter(Node):
         self.declare_parameter('max_y', 2.0)
         self.declare_parameter('outside_value', 0)
         self.declare_parameter('publish_rate_hz', 1.0)
+        self.declare_parameter('start_active', True)
 
         input_map_topic = self.get_parameter('input_map_topic').value
         output_map_topic = self.get_parameter('output_map_topic').value
 
+        self.active = bool(self.get_parameter('start_active').value)
         self.latest_map = None
         self.last_log_nanoseconds = 0
         self.warned_invalid_x_boundary = False
@@ -43,10 +46,27 @@ class FakeBoundaryFilter(Node):
             '/orchard_boundary_marker',
             10,
         )
+        self.status_pub = self.create_publisher(
+            String,
+            '/boundary_filter_status',
+            10,
+        )
         self.create_subscription(
             OccupancyGrid,
             input_map_topic,
             self.map_callback,
+            10,
+        )
+        self.create_subscription(
+            Empty,
+            '/boundary_filter_start',
+            self.start_callback,
+            10,
+        )
+        self.create_subscription(
+            Empty,
+            '/boundary_filter_stop',
+            self.stop_callback,
             10,
         )
 
@@ -56,14 +76,38 @@ class FakeBoundaryFilter(Node):
             publish_rate_hz = 1.0
         self.create_timer(1.0 / publish_rate_hz, self.publish_filtered_map)
 
-        self.get_logger().info(
-            f'Fake boundary filter started: {input_map_topic} -> {output_map_topic}'
-        )
+        if self.active:
+            self.get_logger().info(
+                f'Fake boundary filter started: {input_map_topic} -> {output_map_topic}'
+            )
+            self.publish_status('started')
+        else:
+            self.get_logger().info('Fake boundary filter started inactive')
+            self.publish_status('stopped')
+
+    def publish_status(self, text):
+        msg = String()
+        msg.data = text
+        self.status_pub.publish(msg)
+
+    def start_callback(self, _msg):
+        self.active = True
+        self.get_logger().info('Fake boundary filter started')
+        self.publish_status('started')
+
+    def stop_callback(self, _msg):
+        self.active = False
+        self.get_logger().info('Fake boundary filter stopped')
+        self.publish_status('stopped')
 
     def map_callback(self, msg):
         self.latest_map = msg
 
     def publish_filtered_map(self):
+        if not self.active:
+            self.publish_status('stopped')
+            return
+
         if self.latest_map is None:
             self.publish_boundary_marker()
             return

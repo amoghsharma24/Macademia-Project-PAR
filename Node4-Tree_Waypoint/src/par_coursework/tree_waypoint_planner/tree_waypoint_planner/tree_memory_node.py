@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import rclpy
 from geometry_msgs.msg import Pose, PoseArray
 from rclpy.node import Node
+from std_msgs.msg import Empty, String
 from visualization_msgs.msg import Marker, MarkerArray
 
 
@@ -28,13 +29,18 @@ class TreeMemory(Node):
         self.declare_parameter('publish_rate_hz', 1.0)
         self.declare_parameter('marker_radius', 0.18)
         self.declare_parameter('marker_height', 0.6)
+        self.declare_parameter('start_active', True)
 
+        self.active = bool(self.get_parameter('start_active').value)
         self.tracked_trees = []
         self.previous_marker_count = 0
 
         self.detected_trees_pub = self.create_publisher(PoseArray, '/detected_trees', 10)
         self.marker_pub = self.create_publisher(MarkerArray, '/tracked_tree_markers', 10)
+        self.status_pub = self.create_publisher(String, '/tree_memory_status', 10)
         self.create_subscription(PoseArray, '/trees', self.trees_callback, 10)
+        self.create_subscription(Empty, '/tree_memory_start', self.start_callback, 10)
+        self.create_subscription(Empty, '/tree_memory_stop', self.stop_callback, 10)
 
         publish_rate_hz = float(self.get_parameter('publish_rate_hz').value)
         if publish_rate_hz <= 0.0:
@@ -42,9 +48,32 @@ class TreeMemory(Node):
             publish_rate_hz = 1.0
         self.create_timer(1.0 / publish_rate_hz, self.publish_tracked_trees)
 
+        if self.active:
+            self.get_logger().info('Tree memory node started')
+            self.publish_status('started')
+        else:
+            self.get_logger().info('Tree memory node started inactive')
+            self.publish_status('stopped')
+
+    def publish_status(self, text):
+        msg = String()
+        msg.data = text
+        self.status_pub.publish(msg)
+
+    def start_callback(self, _msg):
+        self.active = True
         self.get_logger().info('Tree memory node started')
+        self.publish_status('started')
+
+    def stop_callback(self, _msg):
+        self.active = False
+        self.get_logger().info('Tree memory node stopped')
+        self.publish_status('stopped')
 
     def trees_callback(self, msg):
+        if not self.active:
+            return
+
         merge_distance = max(0.0, float(self.get_parameter('merge_distance').value))
         smoothing_alpha = float(self.get_parameter('smoothing_alpha').value)
         smoothing_alpha = min(1.0, max(0.0, smoothing_alpha))
@@ -87,6 +116,10 @@ class TreeMemory(Node):
                 )
 
     def publish_tracked_trees(self):
+        if not self.active:
+            self.publish_status('stopped')
+            return
+
         frame_id = self.get_parameter('frame_id').value
         min_observations = max(
             1,

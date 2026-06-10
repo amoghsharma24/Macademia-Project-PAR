@@ -28,7 +28,9 @@ class TreeWaypointPlanner(Node):
         self.declare_parameter('reference_x', 0.0)
         self.declare_parameter('reference_y', 0.0)
         self.declare_parameter('ignore_visited', False)
+        self.declare_parameter('start_active', True)
 
+        self.active = bool(self.get_parameter('start_active').value)
         self.tree_marker_pub = self.create_publisher(MarkerArray, '/tree_markers', 10)
         self.waypoint_marker_pub = self.create_publisher(MarkerArray, '/tree_waypoint_markers', 10)
         self.waypoint_pub = self.create_publisher(PoseArray, '/tree_waypoints', 10)
@@ -45,9 +47,34 @@ class TreeWaypointPlanner(Node):
         self.create_subscription(PoseArray, '/detected_trees', self.detected_trees_callback, 10)
         self.create_subscription(Int32, '/mark_tree_visited', self.mark_tree_visited_callback, 10)
         self.create_subscription(Empty, '/reset_visited_trees', self.reset_visited_trees_callback, 10)
+        self.create_subscription(Empty, '/tree_waypoint_start', self.start_callback, 10)
+        self.create_subscription(Empty, '/tree_waypoint_stop', self.stop_callback, 10)
         self.create_timer(1.0, self.publish_planner_outputs)
 
+        if self.active:
+            self.get_logger().info('Tree waypoint planner started')
+            self.publish_status('started', category='controller', force=True)
+        else:
+            self.get_logger().info('Tree waypoint planner started inactive')
+            self.publish_status('stopped', category='controller', force=True)
+
+    def start_callback(self, _msg):
+        self.active = True
         self.get_logger().info('Tree waypoint planner started')
+        self.publish_status('started', category='controller', force=True)
+
+    def stop_callback(self, _msg):
+        self.active = False
+        self.get_logger().info('Tree waypoint planner stopped')
+        self.publish_status('stopped', category='controller', force=True)
+
+        if self.selected_marker_visible:
+            frame_id = self.get_parameter('frame_id').value
+            stamp = self.get_clock().now().to_msg()
+            self.selected_waypoint_marker_pub.publish(
+                self.create_selected_waypoint_delete_marker(frame_id, stamp)
+            )
+            self.selected_marker_visible = False
 
     def detected_trees_callback(self, msg):
         self.detected_tree_poses = list(msg.poses)
@@ -72,6 +99,9 @@ class TreeWaypointPlanner(Node):
         self.publish_status('reset_visited_trees', category='visited_event', force=True)
 
     def publish_status(self, text, category='planner', force=False):
+        if not self.active and text != 'stopped':
+            return False
+
         changed = self.last_status_by_category.get(category) != text
         if force or changed:
             msg = String()
@@ -81,6 +111,10 @@ class TreeWaypointPlanner(Node):
         return changed
 
     def publish_planner_outputs(self):
+        if not self.active:
+            self.publish_status('stopped', category='controller', force=True)
+            return
+
         frame_id = self.get_parameter('frame_id').value
         tree_poses = self.get_tree_poses()
         waypoint_poses = self.create_waypoint_poses(tree_poses)

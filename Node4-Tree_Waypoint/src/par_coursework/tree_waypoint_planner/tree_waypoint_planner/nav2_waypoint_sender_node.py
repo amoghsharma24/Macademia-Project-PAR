@@ -8,7 +8,7 @@ from geometry_msgs.msg import PoseStamped
 from nav2_msgs.action import NavigateToPose
 from rclpy.action import ActionClient
 from rclpy.node import Node
-from std_msgs.msg import Bool, String
+from std_msgs.msg import Bool, Empty, String
 
 
 class Nav2WaypointSender(Node):
@@ -20,7 +20,9 @@ class Nav2WaypointSender(Node):
         self.declare_parameter('duplicate_distance_tolerance', 0.05)
         self.declare_parameter('duplicate_yaw_tolerance', 0.1)
         self.declare_parameter('action_server_timeout_sec', 5.0)
+        self.declare_parameter('start_active', True)
 
+        self.active = bool(self.get_parameter('start_active').value)
         self.latest_waypoint = None
         self.last_sent_waypoint = None
 
@@ -32,19 +34,47 @@ class Nav2WaypointSender(Node):
             self.selected_waypoint_callback,
             10,
         )
+        self.create_subscription(Empty, '/nav2_sender_start', self.start_callback, 10)
+        self.create_subscription(Empty, '/nav2_sender_stop', self.stop_callback, 10)
 
         self.nav2_client = ActionClient(self, NavigateToPose, '/navigate_to_pose')
+        self.create_timer(1.0, self.publish_inactive_status)
 
-        self.publish_status('waiting_for_waypoint')
-        self.get_logger().info('Nav2 waypoint sender started (auto_send default: false)')
+        if self.active:
+            self.publish_status('started')
+            self.get_logger().info('Nav2 waypoint sender started (auto_send default: false)')
+        else:
+            self.publish_status('stopped')
+            self.get_logger().info('Nav2 waypoint sender started inactive')
 
     def publish_status(self, text):
+        if not self.active and text != 'stopped':
+            return
+
         msg = String()
         msg.data = text
         self.status_pub.publish(msg)
 
+    def publish_inactive_status(self):
+        if not self.active:
+            self.publish_status('stopped')
+
+    def start_callback(self, _msg):
+        self.active = True
+        self.get_logger().info('Nav2 waypoint sender started')
+        self.publish_status('started')
+
+    def stop_callback(self, _msg):
+        self.active = False
+        self.get_logger().info('Nav2 waypoint sender stopped')
+        self.publish_status('stopped')
+
     def selected_waypoint_callback(self, msg):
         self.latest_waypoint = msg
+        if not self.active:
+            self.publish_status('stopped')
+            return
+
         self.get_logger().info(
             f'Received selected waypoint: x={msg.pose.position.x:.3f}, y={msg.pose.position.y:.3f}'
         )
@@ -91,6 +121,10 @@ class Nav2WaypointSender(Node):
         return distance <= distance_tol and yaw_diff <= yaw_tol
 
     def send_goal(self, waypoint):
+        if not self.active:
+            self.publish_status('stopped')
+            return
+
         timeout_sec = self.get_parameter('action_server_timeout_sec').value
         if not self.nav2_client.wait_for_server(timeout_sec=timeout_sec):
             self.get_logger().warn('Nav2 action server unavailable')

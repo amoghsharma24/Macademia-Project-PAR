@@ -1,3 +1,96 @@
+## Waypoint Stack Launch
+
+Build and source the package, then launch the complete waypoint subsystem:
+
+```bash
+colcon build --packages-select tree_waypoint_planner
+source install/setup.bash
+ros2 launch tree_waypoint_planner tree_waypoint_stack.launch.py
+```
+
+For a visual test using the planner's hard-coded trees without the boundary filter or tree memory:
+
+```bash
+ros2 launch tree_waypoint_planner tree_waypoint_stack.launch.py \
+  use_boundary_filter:=false \
+  use_memory:=false \
+  use_hardcoded_trees:=true
+```
+
+For live detections published on `/trees`, enable memory and disable hard-coded trees:
+
+```bash
+ros2 launch tree_waypoint_planner tree_waypoint_stack.launch.py \
+  use_memory:=true \
+  use_hardcoded_trees:=false
+```
+
+The boundary filter requires an occupancy grid on `/map`. Disable it with
+`use_boundary_filter:=false` when no map is available.
+
+`auto_send` defaults to `false` for safety. Set `auto_send:=true` only when the
+Nav2 action server is ready and automatic waypoint execution is intended.
+
+## Controller start/stop interface
+
+controller publishes start and stop messages. Each node listens to its
+controller topics, enables or disables its normal data processing, and publishes
+its current status.
+
+| Node | Start topic | Stop topic | Status topic |
+| --- | --- | --- | --- |
+| `fake_boundary_filter_node` | `/boundary_filter_start` | `/boundary_filter_stop` | `/boundary_filter_status` |
+| `tree_memory_node` | `/tree_memory_start` | `/tree_memory_stop` | `/tree_memory_status` |
+| `tree_waypoint_planner_node` | `/tree_waypoint_start` | `/tree_waypoint_stop` | `/tree_waypoint_status` |
+| `nav2_waypoint_sender_node` | `/nav2_sender_start` | `/nav2_sender_stop` | `/nav2_waypoint_status` |
+
+All four nodes provide a `start_active` parameter with a default of `true`.
+When stopped, the nodes continue listening for controller messages and publishing
+status where practical, but do not publish their normal output data. The Nav2
+sender does not send new goals while stopped. `auto_send` remains `false` by
+default for safety.
+
+Build the package:
+
+```bash
+cd /home/rmitaiil/Macademia-Project-PAR/Node4-Tree_Waypoint
+colcon build --packages-select tree_waypoint_planner
+source install/setup.bash
+```
+
+Run the stack initially stopped:
+
+```bash
+ros2 launch tree_waypoint_planner tree_waypoint_stack.launch.py \
+  use_hardcoded_trees:=true \
+  use_memory:=false \
+  use_boundary_filter:=false \
+  frame_id:=map \
+  auto_send:=false \
+  start_active:=false
+```
+
+Echo planner and Nav2 sender status:
+
+```bash
+ros2 topic echo /tree_waypoint_status
+ros2 topic echo /nav2_waypoint_status
+```
+
+Start and stop the planner:
+
+```bash
+ros2 topic pub --once /tree_waypoint_start std_msgs/msg/Empty "{}"
+ros2 topic pub --once /tree_waypoint_stop std_msgs/msg/Empty "{}"
+```
+
+Start and stop the Nav2 sender:
+
+```bash
+ros2 topic pub --once /nav2_sender_start std_msgs/msg/Empty "{}"
+ros2 topic pub --once /nav2_sender_stop std_msgs/msg/Empty "{}"
+```
+
 ## ROS2 Topics
 
 The `tree_waypoint_planner` package uses ROS2 topics to connect the tree detection, waypoint planning, RViz visualisation, and future Nav2 handoff parts of the system.
@@ -220,3 +313,5 @@ Set `Fixed Frame` to `map` and add:
 * `Map` on `/map`
 * `Map` on `/filtered_map`
 * `Marker` on `/orchard_boundary_marker`
+
+
