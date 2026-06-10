@@ -5,6 +5,7 @@ import math
 import rclpy
 from geometry_msgs.msg import Pose, PoseArray, PoseStamped
 from rclpy.node import Node
+from std_msgs.msg import Empty, Int32, String
 from visualization_msgs.msg import Marker, MarkerArray
 
 
@@ -26,29 +27,78 @@ class TreeWaypointPlanner(Node):
         self.declare_parameter('selected_tree_index', 0)
         self.declare_parameter('reference_x', 0.0)
         self.declare_parameter('reference_y', 0.0)
+        self.declare_parameter('ignore_visited', False)
 
         self.tree_marker_pub = self.create_publisher(MarkerArray, '/tree_markers', 10)
         self.waypoint_marker_pub = self.create_publisher(MarkerArray, '/tree_waypoint_markers', 10)
         self.waypoint_pub = self.create_publisher(PoseArray, '/tree_waypoints', 10)
         self.selected_waypoint_pub = self.create_publisher(PoseStamped, '/selected_tree_waypoint', 10)
         self.selected_waypoint_marker_pub = self.create_publisher(Marker, '/selected_tree_waypoint_marker', 10)
+        self.status_pub = self.create_publisher(String, '/tree_waypoint_status', 10)
 
         self.detected_tree_poses = []
+        self.visited_indices = set()
+        self.last_status_by_category = {}
+        self.selected_marker_visible = False
         self.previous_tree_marker_count = 0
         self.previous_waypoint_marker_count = 0
         self.create_subscription(PoseArray, '/detected_trees', self.detected_trees_callback, 10)
+        self.create_subscription(Int32, '/mark_tree_visited', self.mark_tree_visited_callback, 10)
+        self.create_subscription(Empty, '/reset_visited_trees', self.reset_visited_trees_callback, 10)
         self.create_timer(1.0, self.publish_planner_outputs)
 
         self.get_logger().info('Tree waypoint planner started')
 
     def detected_trees_callback(self, msg):
         self.detected_tree_poses = list(msg.poses)
+        self.publish_status(
+            f'received_{len(self.detected_tree_poses)}_trees',
+            category='detected_trees',
+        )
+
+    def mark_tree_visited_callback(self, msg):
+        index = int(msg.data)
+        if index < 0:
+            self.get_logger().warn(f'Ignoring invalid negative waypoint index: {index}')
+            return
+
+        self.visited_indices.add(index)
+        self.get_logger().info(f'Waypoint index {index} marked visited')
+        self.publish_status(f'marked_visited_{index}', category='visited_event', force=True)
+
+    def reset_visited_trees_callback(self, _msg):
+        self.visited_indices.clear()
+        self.get_logger().info('Visited waypoint indices reset')
+        self.publish_status('reset_visited_trees', category='visited_event', force=True)
+
+    def publish_status(self, text, category='planner', force=False):
+        changed = self.last_status_by_category.get(category) != text
+        if force or changed:
+            msg = String()
+            msg.data = text
+            self.status_pub.publish(msg)
+        self.last_status_by_category[category] = text
+        return changed
 
     def publish_planner_outputs(self):
         frame_id = self.get_parameter('frame_id').value
         tree_poses = self.get_tree_poses()
         waypoint_poses = self.create_waypoint_poses(tree_poses)
         stamp = self.get_clock().now().to_msg()
+
+        if self.get_parameter('use_hardcoded_trees').value:
+            self.publish_status('using_hardcoded_trees', category='tree_source')
+        elif not tree_poses:
+            self.publish_status(
+                'waiting_for_detected_trees',
+                category='selection',
+                force=True,
+            )
+
+        self.publish_status(
+            f'generated_{len(waypoint_poses)}_waypoints',
+            category='waypoint_count',
+        )
 
         waypoint_array = PoseArray()
         waypoint_array.header.stamp = stamp
@@ -71,6 +121,17 @@ class TreeWaypointPlanner(Node):
             self.selected_waypoint_marker_pub.publish(
                 self.create_selected_waypoint_marker(selected_pose, frame_id, stamp, selected_index)
             )
+            self.selected_marker_visible = True
+            self.publish_status(
+                f'selected_waypoint_{selected_index}',
+                category='selection',
+                force=True,
+            )
+        elif self.selected_marker_visible:
+            self.selected_waypoint_marker_pub.publish(
+                self.create_selected_waypoint_delete_marker(frame_id, stamp)
+            )
+            self.selected_marker_visible = False
 
     def get_tree_poses(self):
         if self.get_parameter('use_hardcoded_trees').value:
@@ -147,15 +208,29 @@ class TreeWaypointPlanner(Node):
         if selection_mode == 'nearest':
             reference_x = self.get_parameter('reference_x').value
             reference_y = self.get_parameter('reference_y').value
-            selected_index = 0
+            ignore_visited = self.get_parameter('ignore_visited').value
+            selected_index = None
             selected_distance = None
             for index, waypoint_pose in enumerate(waypoint_poses):
+                if not ignore_visited and index in self.visited_indices:
+                    continue
                 dx = waypoint_pose.position.x - reference_x
                 dy = waypoint_pose.position.y - reference_y
                 distance = math.hypot(dx, dy)
                 if selected_distance is None or distance < selected_distance:
                     selected_distance = distance
                     selected_index = index
+
+            if selected_index is None:
+                status_changed = self.publish_status(
+                    'all_waypoints_visited',
+                    category='selection',
+                    force=True,
+                )
+                if status_changed:
+                    self.get_logger().info('All generated waypoints are marked visited')
+                return None, None
+
             return selected_index, waypoint_poses[selected_index]
 
         # index mode is useful for testing specific waypoints.
@@ -186,6 +261,15 @@ class TreeWaypointPlanner(Node):
         marker.color.b = 1.0
         marker.color.a = 1.0
         marker.text = str(selected_index)
+        return marker
+
+    def create_selected_waypoint_delete_marker(self, frame_id, stamp):
+        marker = Marker()
+        marker.header.frame_id = frame_id
+        marker.header.stamp = stamp
+        marker.ns = 'selected_tree_waypoint'
+        marker.id = 0
+        marker.action = Marker.DELETE
         return marker
 
     def yaw_to_quaternion(self, yaw):
@@ -252,9 +336,14 @@ class TreeWaypointPlanner(Node):
             marker.scale.x = 0.25
             marker.scale.y = 0.08
             marker.scale.z = 0.08
-            marker.color.r = 1.0
-            marker.color.g = 0.45
-            marker.color.b = 0.0
+            if marker_id in self.visited_indices:
+                marker.color.r = 0.45
+                marker.color.g = 0.45
+                marker.color.b = 0.45
+            else:
+                marker.color.r = 1.0
+                marker.color.g = 0.45
+                marker.color.b = 0.0
             marker.color.a = 0.9
             marker_array.markers.append(marker)
 

@@ -21,6 +21,9 @@ The main waypoint planner node publishes:
 * `/selected_tree_waypoint_marker` (`visualization_msgs/msg/Marker`)
   RViz marker showing the currently selected waypoint more clearly.
 
+* `/tree_waypoint_status` (`std_msgs/msg/String`)
+  Planner state updates such as detected tree count, generated waypoint count, selected index, visited-index events, and completion.
+
 The Nav2 sender node publishes:
 
 * `/nav2_waypoint_status` (`std_msgs/msg/String`)
@@ -35,6 +38,12 @@ The waypoint planner node subscribes to:
 
 * `/detected_trees` (`geometry_msgs/msg/PoseArray`)
   Tree positions from the detection system. For testing, this can also come from the fake tree publisher node.
+
+* `/mark_tree_visited` (`std_msgs/msg/Int32`)
+  Marks a nonnegative waypoint index as visited.
+
+* `/reset_visited_trees` (`std_msgs/msg/Empty`)
+  Clears all visited waypoint indices.
 
 The Nav2 sender node subscribes to:
 
@@ -113,3 +122,101 @@ Verify the tracked output from another terminal:
 ```bash
 ros2 topic echo /detected_trees
 ```
+
+## Visited Waypoint Tracking
+
+In `nearest` selection mode, the planner selects the nearest unvisited waypoint by default. Visited waypoint arrows are grey in `/tree_waypoint_markers`, while unvisited arrows remain orange and the selected waypoint marker remains blue.
+
+`index` mode can still select visited waypoints and remains useful for testing a specific waypoint. Set `ignore_visited:=true` to restore the previous nearest-waypoint behaviour:
+
+```bash
+ros2 run tree_waypoint_planner tree_waypoint_planner_node --ros-args -p ignore_visited:=true
+```
+
+Run the planner:
+
+```bash
+ros2 run tree_waypoint_planner tree_waypoint_planner_node
+```
+
+Mark waypoint index 0 visited:
+
+```bash
+ros2 topic pub --once /mark_tree_visited std_msgs/msg/Int32 "{data: 0}"
+```
+
+Reset all visited indices:
+
+```bash
+ros2 topic pub --once /reset_visited_trees std_msgs/msg/Empty "{}"
+```
+
+Echo planner status:
+
+```bash
+ros2 topic echo /tree_waypoint_status
+```
+
+## Fake Orchard Boundary Filter Node
+
+`fake_boundary_filter_node` filters the full occupancy grid map to a rectangular fake orchard area. It exists so lab clutter outside the test orchard area, such as table legs, chairs, walls, or other random obstacles, can be hidden from Joshua's tree detection without changing the detector or waypoint planner.
+
+### Topics
+
+* Subscribes to `/map` (`nav_msgs/msg/OccupancyGrid`)
+  Full occupancy grid map.
+
+* Publishes `/filtered_map` (`nav_msgs/msg/OccupancyGrid`)
+  Copy of the latest map where cells outside the configured rectangle are replaced with `outside_value`.
+
+* Publishes `/orchard_boundary_marker` (`visualization_msgs/msg/Marker`)
+  Yellow `LINE_STRIP` rectangle showing the active fake orchard boundary in RViz.
+
+Joshua's tree detection should subscribe to `/filtered_map` instead of `/map` when running in the lab fake-orchard setup.
+
+### Parameters
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `input_map_topic` | `/map` | Occupancy grid topic to filter. |
+| `output_map_topic` | `/filtered_map` | Filtered occupancy grid output topic. |
+| `frame_id` | `map` | Marker frame used before a map has been received. |
+| `min_x` | `0.0` | Minimum rectangle x coordinate in map frame metres. |
+| `max_x` | `5.0` | Maximum rectangle x coordinate in map frame metres. |
+| `min_y` | `-2.0` | Minimum rectangle y coordinate in map frame metres. |
+| `max_y` | `2.0` | Maximum rectangle y coordinate in map frame metres. |
+| `outside_value` | `0` | Occupancy value written to cells outside the rectangle. |
+| `publish_rate_hz` | `1.0` | Rate for publishing the filtered map and boundary marker. |
+
+### Build
+
+```bash
+colcon build --packages-select tree_waypoint_planner
+source install/setup.bash
+```
+
+### Run
+
+```bash
+ros2 run tree_waypoint_planner fake_boundary_filter_node --ros-args \
+  -p min_x:=0.0 \
+  -p max_x:=5.0 \
+  -p min_y:=-2.0 \
+  -p max_y:=2.0 \
+  -p outside_value:=0
+```
+
+### Check Topics
+
+```bash
+ros2 topic echo /filtered_map --once
+ros2 topic list | grep map
+```
+
+### RViz
+
+Set `Fixed Frame` to `map` and add:
+
+* `Map` on `/map`
+* `Map` on `/filtered_map`
+* `Marker` on `/orchard_boundary_marker`

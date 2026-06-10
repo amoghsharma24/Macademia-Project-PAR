@@ -24,6 +24,7 @@ setup(
     entry_points={
         'console_scripts': [
             'fake_tree_publisher_node = tree_waypoint_planner.fake_tree_publisher_node:main',
+            'fake_boundary_filter_node = tree_waypoint_planner.fake_boundary_filter_node:main',
             'tree_memory_node = tree_waypoint_planner.tree_memory_node:main',
             'tree_waypoint_planner_node = tree_waypoint_planner.tree_waypoint_planner_node:main',
             'nav2_waypoint_sender_node = tree_waypoint_planner.nav2_waypoint_sender_node:main',
