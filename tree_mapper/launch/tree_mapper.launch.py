@@ -51,6 +51,16 @@ def generate_launch_description():
             #     default_value="0.09",
             #     description="Maximum circle radius to detect (meters)",
             # ),
+            DeclareLaunchArgument(
+                "radius_min",
+                default_value="-1.0",
+                description="Minimum circle radius to detect (pixels)",
+            ),
+            DeclareLaunchArgument(
+                "radius_max",
+                default_value="5.0",
+                description="Maximum circle radius to detect (pixels)",
+            ),
             # endregion
             # region nodes
             Node(
@@ -67,6 +77,8 @@ def generate_launch_description():
                         # "hough.param2": LaunchConfiguration("hough_param2"),
                         # "hough.min_radius": LaunchConfiguration("hough_min_radius"),
                         # "hough.max_radius": LaunchConfiguration("hough_max_radius"),
+                        "max_radius": LaunchConfiguration("radius_max"),
+                        "min_radius": LaunchConfiguration("radius_min"),
                     }
                 ],
             ),

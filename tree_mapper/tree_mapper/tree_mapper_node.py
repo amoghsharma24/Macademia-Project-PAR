@@ -5,20 +5,9 @@
 
 # one shot, no history.
 
-# current goal: load occupancy grid.
-
-# from rclpy.action import ActionClient
-# from geometry_msgs.msg import Posetamped
-# from nav_msgs.msg import Path
-# from std_msgs.msg import String, Empty
-# from nav2_msgs.action import FollowWaypoints
-# import tf2_ros
-# from tf2_ros import TransformException
-# import math
 import cv2
 import numpy as np
 import rclpy
-import yaml
 from builtin_interfaces.msg import Time
 from geometry_msgs.msg import Pose, PoseArray
 from nav_msgs.msg import OccupancyGrid
@@ -38,18 +27,15 @@ map_qos = QoSProfile(
 
 class treeMapper(Node):
     def __init__(self) -> None:
+
         super().__init__("tree_mapper_node")
 
         self.declare_parameters(
             namespace="",
             parameters=[
                 ("image_path", "."),
-                # ("hough.dp", 1.0),
-                # ("hough.min_dist", 1.0),
-                # ("hough.param1", 1.0),
-                # ("hough.param2", 1.0),
-                # ("hough.min_radius", 1.0),
-                # ("hough.max_radius", 1.0),
+                ("max_radius", 1.0),
+                ("min_radius", 1.0),
             ],
         )
 
@@ -58,9 +44,11 @@ class treeMapper(Node):
         self.most_recent_map = None
         self.most_recent_resolution = None
         self.most_recent_time = None
+        self.parameters = None
 
         # Publishers
         self.tree_publisher = self.create_publisher(PoseArray, "/trees", 10)
+        self.single_tree_publisher = self.create_publisher(Pose, "/tree", 1)
 
         # TF
         # self.tf_buffer = tf2_ros.Buffer()
@@ -72,66 +60,18 @@ class treeMapper(Node):
         # Parameters
         self.map_path = self.get_parameter("image_path").value
 
-        # Nav2 client
-        # self.waypoint_client = ActionClient(self, FollowWaypoints, "/follow_waypoints")
-
         # Subscriptions
         self.create_subscription(
             OccupancyGrid, "/map", self.parse_occupancy_msg, map_qos
         )
 
-        # Wait for Nav2
-        # self.get_logger().info("Waiting for Nav2 waypoint server...")
-        # self.waypoint_client.wait_for_server()
-        # self.get_logger().info("Path Tracker Node Started")
-
-    # region loading functions
-    def load_map(self, map_path: str) -> NDArray[np.uint8]:
-        img = cv2.imread(map_path + "/turtlebot_area.pgm", cv2.IMREAD_GRAYSCALE)
-        # make it RGB so placed trees are seen easier.
-        return img
-
-    def load_map_yaml(self, yaml_path: str) -> Dict[str, any]:
-        """
-        Load a ROS2/Nav2 map YAML file.
-
-        Returns:
-            dict containing:
-                image
-                mode
-                resolution
-                origin
-                negate
-                occupied_thresh
-                free_thresh
-        """
-
-        with open(yaml_path, "r") as file:
-            data = yaml.safe_load(file)
-
-        map_data = {
-            "origin": data["origin"],
-            "negate": int(data["negate"]),
-            "occupied_thresh": float(data["occupied_thresh"]),
-            "free_thresh": float(data["free_thresh"]),
-        }
-
-        return map_data
-
-    # endregion
     # region main functions
-    def filter_map(
-        self,
-        parsed_map: NDArray[np.uint8],
-    ) -> NDArray[np.uint8]:
-        # one less than grey
-        ret, thresh = cv2.threshold(parsed_map, 126, 255, cv2.THRESH_BINARY_INV)
-        return thresh
 
     def detect_contours(
         self,
         img: NDArray[np.uint8],
-    ) -> NDArray[np.float32] | None:
+    ) -> NDArray[np.float32] or None:
+
         contours, hierarchy = cv2.findContours(
             img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
         )
@@ -139,53 +79,25 @@ class treeMapper(Node):
         return contours
 
     def filter_contours(
-        self,
-        contours: NDArray[np.float32],
-    ) -> NDArray[np.float32] | None:
-        trees = []
+        self, contours: NDArray[np.float32]
+    ) -> List[Tuple[float, float]]:
+
+        filtered = []
+
+        min_radius = self.parameters["min_radius"]
+
+        max_radius = self.parameters["max_radius"]
+
         for c in contours:
-            peri = cv2.arcLength(c, True)
-            approx = cv2.approxPolyDP(c, peri, True)
-            area = cv2.contourArea(c)
+            # area = cv2.contourArea(c)
 
             (x, y), radius = cv2.minEnclosingCircle(c)
-            # filtered_cnts.append((peri, len(approx), area, x, y, radius))
 
-            if (
-                len(approx) > 0
-                and
-                # area = 0 only for single points.
-                area > 0
-                and area < 5
-                and radius < 3
-                and peri > 2
-                and peri < 10
-            ):
-                trees.append((x, y, radius))
+            if radius >= min_radius and radius <= max_radius:
+                # self.publish_circle(x, y, radius)
+                filtered.append((x, y))
 
-    def draw_circles(
-        self,
-        base_image: NDArray[np.uint8],
-        circles: NDArray[np.float32] | None,
-    ) -> NDArray[np.uint8] | None:
-        if circles is not None:
-            circles = np.uint16(np.around(circles))
-            for circle in circles:
-                for x, y, r in circle:
-                    cv2.circle(base_image, (x, y), r, (0, 255, 0), 1)  # Circle outline
-                    cv2.circle(base_image, (x, y), 1, (0, 0, 255), 2)  # Center point
-
-            return base_image
-        return None
-
-    def save_image(
-        self,
-        img_path: str,
-        img: NDArray[np.uint8],
-    ) -> None:
-        image_path = img_path + "/detected-trees.jpeg"
-        cv2.imwrite(image_path, img)
-        self.get_logger().info(f"image saved: {image_path}")
+        return filtered
 
     # endregion
 
@@ -193,7 +105,8 @@ class treeMapper(Node):
     def convert_parameters_to_pixels(self, parameters: list):
         newParams = []
         for p in parameters:
-            newParams.append(int(p * self.most_recent_resolution))
+            newParams.append(int(p / self.most_recent_resolution))
+
         return newParams
 
     def convert_grid_to_image(
@@ -201,7 +114,10 @@ class treeMapper(Node):
         msg: OccupancyGrid,
     ) -> NDArray[np.uint8]:
         """
-        Convert a ROS2 OccupancyGrid into an OpenCV grayscale image.
+
+        Convert a ROS2 OccupancyGrid into an OpenCV binary image.
+
+
 
         OccupancyGrid values:
             -1   = unknown
@@ -215,20 +131,21 @@ class treeMapper(Node):
         # Convert flat occupancy data into numpy array
         grid = np.array(msg.data, dtype=np.int8).reshape((height, width))
 
-        # Create grayscale image
+        # Create binary image
+
         # free      -> 255 (white)
         # occupied  -> 0   (black)
-        # unknown   -> 127 (gray)
+
+        # unknown   -> 0 (gray)
+
         img = np.zeros((height, width), dtype=np.uint8)
 
-        img[grid <= 19.6] = 255
-        img[grid >= 65] = 0
-        # img[grid == -1] = 127
+        img[(grid <= 25) & (grid >= 0)] = 0
 
-        # Flip vertically so map orientation matches RViz/world coordinates
-        # img = cv2.flip(img, 0)
+        img[grid >= 65] = 255
 
-        # Store image for later use
+        img[grid == -1] = 0
+
         return img
 
     def convert_circles_to_map(
@@ -236,21 +153,20 @@ class treeMapper(Node):
         origin: Dict[str, float],
         resolution: float,
         circles: NDArray[np.float32],
-    ) -> List[Tuple[float, float, float]]:
+    ) -> List[Tuple[float, float]]:
+
         # 1. convert to correct resolution
         # 2. convert to map frame
         # - is positive x forward? is positive y left?
-        # 3. parse data into markers
-        # 4. publish markers
-        circles_scaled = circles * resolution
 
         circles_translated = []
-        for circle in circles_scaled:
-            for x, y, r in circle:
-                x_meters = x + origin["origin_x"]
-                y_meters = y + origin["origin_y"]
-                r_meters = r
-                circles_translated.append((x_meters, y_meters, r_meters))
+
+        for x, y in circles:
+            x_meters = x * resolution + origin["origin_x"]
+
+            y_meters = y * resolution + origin["origin_y"]
+
+            circles_translated.append((x_meters, y_meters))
 
         # self.get_logger().info(f"trees transformed: {circles_translated}")
         return circles_translated
@@ -273,38 +189,27 @@ class treeMapper(Node):
         return metadata
 
     def generate_trees(
-        self,
-        map_image: NDArray[np.uint8],
-    ) -> NDArray[np.float32] | None:
-        output = cv2.cvtColor(map_image, cv2.COLOR_GRAY2RGB)
+        self, map_image: NDArray[np.uint8]
+    ) -> List[Tuple[float, float]] or None:
 
-        map_img = self.filter_map(map_image)
+        contours = self.detect_contours(map_image)
 
-        contours = self.detect_contours(map_img)
-
-        if contours is None:
+        if len(contours) == 0:
             self.get_logger().info("no trees detected")
             return None
 
         trees = self.filter_contours(contours)
-        if trees is None:
+
+        if len(trees) == 0:
             self.get_logger().info("all trees were filtered out")
             return None
 
-        self.get_logger().info(f"trees detected: {len(trees[0])}")
+        self.get_logger().info(f"trees detected: {len(trees)}")
 
-        final_img = self.draw_circles(output, contours)
-
-        self.save_image(self.map_path, final_img)
-        # for drawing function.
-        return [trees]
+        return trees
 
     # endregion
     # region control methods
-
-    def generate_from_saved(self) -> None:
-        map_img = self.load_map(self.map_path)
-        self.generate_trees(map_img)
 
     def generate_from_topic(self) -> None:
         if (
@@ -312,14 +217,12 @@ class treeMapper(Node):
             or self.most_recent_origin is None
             or self.most_recent_resolution is None
             or self.most_recent_time is None
+            or self.parameters is None
         ):
             return
 
-        map_img = self.filter_map(self.most_recent_map)
-        self.get_logger().info("1/4 map image gotten")
-
-        circles = self.generate_trees(map_img)
-        self.get_logger().info("2/4 circles gotten")
+        circles = self.generate_trees(self.most_recent_map)
+        self.get_logger().info("1/3 trees gotten")
 
         if circles is None:
             return
@@ -327,10 +230,10 @@ class treeMapper(Node):
         transformed_circles = self.convert_circles_to_map(
             self.most_recent_origin, self.most_recent_resolution, circles
         )
-        self.get_logger().info("3/4 circles transformed")
 
+        self.get_logger().info("2/3 circles transformed")
         self.publish_circles(transformed_circles, self.most_recent_time)
-        self.get_logger().info("4/4 circles published")
+        self.get_logger().info("3/3 circles published")
 
     # endregion
     # region subscribers
@@ -342,26 +245,24 @@ class treeMapper(Node):
         self.most_recent_map = self.convert_grid_to_image(msg)
         self.most_recent_resolution = msg.info.resolution
         self.most_recent_time = msg.info.map_load_time
+        self.parameters = self.get_parameters()
 
     # endregion
 
     # region value grabbers
-    def get_hough_parameters(self):
+
+    def get_parameters(self):
+
         distance_params = [
-            self.get_parameter("hough.min_dist").value,
-            self.get_parameter("hough.min_radius").value,
-            self.get_parameter("hough.max_radius").value,
+            self.get_parameter("min_radius").value,
+            self.get_parameter("max_radius").value,
         ]
 
         scaled_params = self.convert_parameters_to_pixels(distance_params)
 
         params_dict = {
-            "dp": self.get_parameter("hough.dp").value,
-            "min_dist": scaled_params[0],
-            "param1": self.get_parameter("hough.param1").value,
-            "param2": self.get_parameter("hough.param2").value,
-            "min_radius": scaled_params[1],
-            "max_radius": scaled_params[2],
+            "min_radius": scaled_params[0],
+            "max_radius": scaled_params[1],
         }
         return params_dict
 
@@ -369,7 +270,7 @@ class treeMapper(Node):
     # region publishers
     def publish_circles(
         self,
-        circles: List[Tuple[float, float, float]],
+        circles: List[Tuple[float, float]],
         time: Time,
     ) -> None:
         trees = PoseArray()
@@ -378,7 +279,8 @@ class treeMapper(Node):
 
         # Create the poses
         detected_trees = []
-        for x, y, r in circles:
+
+        for x, y in circles:
             pose = Pose()
 
             pose.position.x = float(x)
@@ -395,6 +297,22 @@ class treeMapper(Node):
         trees.poses = detected_trees
         # Publish
         self.tree_publisher.publish(trees)
+
+    def publish_circle(self, x, y, r) -> None:
+        tree = Pose()
+        tree.header.frame_id = "map"
+        tree.header.stamp = self.most_recent_time
+        tree.position.x = float(x)
+        tree.position.y = float(y)
+        tree.position.z = 0.0
+
+        tree.orientation.x = 0.0
+        tree.orientation.y = 0.0
+        tree.orientation.z = 0.0
+        tree.orientation.w = 1.0
+
+        # Publish
+        self.single_tree_publisher.publish(tree)
 
     # endregion
 
