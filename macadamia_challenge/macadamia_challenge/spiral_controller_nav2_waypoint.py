@@ -3,7 +3,7 @@ import math
 import rclpy
 from action_msgs.msg import GoalStatus
 from geometry_msgs.msg import PoseStamped, TwistStamped
-from nav2_msgs.action import NavigateToPose
+from nav2_msgs.action import NavigateThroughPoses
 from nav_msgs.msg import Odometry
 from rclpy.action import ActionClient
 from rclpy.node import Node
@@ -22,12 +22,18 @@ class SpiralController(Node):
         self.declare_parameter('loop_spacing', 1.0)
         self.declare_parameter('robot_width', 0.233)
         self.declare_parameter('theta_step', 0.04)
+        self.declare_parameter('waypoint_spacing', 0.35)
+        self.declare_parameter('max_theta_step', 0.45)
+        self.declare_parameter('batch_size', 8)
         self.declare_parameter('start_with_min_radius_circle', True)
         self.declare_parameter('initial_circle_angle', 2.0 * math.pi)
         self.declare_parameter('goal_frame', 'map')
+        self.declare_parameter('stamp_goals', False)
         self.declare_parameter('odom_topic', '/odometry/filtered')
-        self.declare_parameter('nav2_action_name', 'navigate_to_pose')
+        self.declare_parameter('nav2_action_name', 'navigate_through_poses')
+        self.declare_parameter('yaw_mode', 'path')
         self.declare_parameter('max_fallback_attempts', 4)
+        self.declare_parameter('max_consecutive_rejections', 6)
         self.declare_parameter('fallback_angle_step', 0.35)
         self.declare_parameter('fallback_radius_step', 0.15)
 
@@ -38,12 +44,18 @@ class SpiralController(Node):
         self.loop_spacing = self.get_parameter('loop_spacing').value
         self.robot_width = self.get_parameter('robot_width').value
         self.theta_step = self.get_parameter('theta_step').value
+        self.waypoint_spacing = self.get_parameter('waypoint_spacing').value
+        self.max_theta_step = self.get_parameter('max_theta_step').value
+        self.batch_size = self.get_parameter('batch_size').value
         self.start_with_min_radius_circle = self.get_parameter('start_with_min_radius_circle').value
         self.initial_circle_angle = self.get_parameter('initial_circle_angle').value
         self.goal_frame = self.get_parameter('goal_frame').value
+        self.stamp_goals = self.get_parameter('stamp_goals').value
         self.odom_topic = self.get_parameter('odom_topic').value
         self.nav2_action_name = self.get_parameter('nav2_action_name').value
+        self.yaw_mode = self.get_parameter('yaw_mode').value
         self.max_fallback_attempts = self.get_parameter('max_fallback_attempts').value
+        self.max_consecutive_rejections = self.get_parameter('max_consecutive_rejections').value
         self.fallback_angle_step = self.get_parameter('fallback_angle_step').value
         self.fallback_radius_step = self.get_parameter('fallback_radius_step').value
 
@@ -63,7 +75,7 @@ class SpiralController(Node):
             10
         )
 
-        self.nav_client = ActionClient(self, NavigateToPose, self.nav2_action_name)
+        self.nav_client = ActionClient(self, NavigateThroughPoses, self.nav2_action_name)
 
         self.started = False
         self.finished = False
@@ -71,7 +83,9 @@ class SpiralController(Node):
         self.goal_handle = None
         self.current_goal_is_fallback = False
         self.current_spiral_goal = None
+        self.current_batch = []
         self.fallback_attempts = 0
+        self.consecutive_rejections = 0
 
         self.k = self.spiral_growth_rate()
         if not self.start_with_min_radius_circle:
@@ -118,14 +132,38 @@ class SpiralController(Node):
             self.finish_spiral()
             return
 
-        self.send_spiral_goal()
+        self.send_spiral_batch()
 
-    def send_spiral_goal(self):
-        x, y, yaw, radius = self.spiral_pose_for_theta(self.theta)
-        self.current_spiral_goal = (x, y, yaw, radius, self.theta)
+    def send_spiral_batch(self):
+        self.current_batch = self.build_spiral_batch()
+        if not self.current_batch:
+            self.finish_spiral()
+            return
+
+        x, y, yaw, radius, theta = self.current_batch[0]
+        self.current_spiral_goal = (x, y, yaw, radius, theta)
         self.fallback_attempts = 0
         self.publish_marker(1, x, y, 1.0, 0.0, 0.0, 'spiral_goal')
-        self.send_nav_goal(x, y, yaw, is_fallback=False)
+        poses = [
+            self.make_pose_stamped(goal_x, goal_y, goal_yaw)
+            for goal_x, goal_y, goal_yaw, _, _ in self.current_batch
+        ]
+        self.send_nav_goal(poses, is_fallback=False)
+
+    def build_spiral_batch(self):
+        batch = []
+        theta = self.theta
+
+        while len(batch) < max(1, int(self.batch_size)):
+            radius = self.radius_for_theta(theta)
+            if radius > self.max_radius:
+                break
+
+            x, y, yaw, radius = self.spiral_pose_for_theta(theta)
+            batch.append((x, y, yaw, radius, theta))
+            theta += self.theta_step_for_radius(radius)
+
+        return batch
 
     def send_fallback_goal(self):
         if self.current_spiral_goal is None:
@@ -148,11 +186,11 @@ class SpiralController(Node):
             f'Sending fallback goal {self.fallback_attempts}/{self.max_fallback_attempts}: '
             f'x={x:.3f}, y={y:.3f}'
         )
-        self.send_nav_goal(x, y, yaw, is_fallback=True)
+        self.send_nav_goal([self.make_pose_stamped(x, y, yaw)], is_fallback=True)
 
-    def send_nav_goal(self, x, y, yaw, is_fallback):
-        goal_msg = NavigateToPose.Goal()
-        goal_msg.pose = self.make_pose_stamped(x, y, yaw)
+    def send_nav_goal(self, poses, is_fallback):
+        goal_msg = NavigateThroughPoses.Goal()
+        goal_msg.poses = poses
 
         self.goal_active = True
         self.current_goal_is_fallback = is_fallback
@@ -161,8 +199,12 @@ class SpiralController(Node):
         future.add_done_callback(self.goal_response_callback)
 
         goal_name = 'fallback' if is_fallback else 'spiral'
+        first_pose = poses[0].pose
+        last_pose = poses[-1].pose
         self.get_logger().info(
-            f'Sent {goal_name} Nav2 goal: x={x:.3f}, y={y:.3f}, yaw={yaw:.3f}, '
+            f'Sent {goal_name} Nav2 goal with {len(poses)} pose(s): '
+            f'first x={first_pose.position.x:.3f}, y={first_pose.position.y:.3f}; '
+            f'last x={last_pose.position.x:.3f}, y={last_pose.position.y:.3f}; '
             f'theta={self.theta:.3f}'
         )
 
@@ -171,6 +213,10 @@ class SpiralController(Node):
 
         if not goal_handle.accepted:
             self.goal_active = False
+            self.record_goal_rejection()
+            if not self.started:
+                return
+
             goal_name = 'fallback' if self.current_goal_is_fallback else 'spiral'
             self.get_logger().warn(f'Nav2 rejected {goal_name} goal')
             self.send_fallback_goal()
@@ -186,6 +232,7 @@ class SpiralController(Node):
         self.goal_handle = None
 
         if result.status == GoalStatus.STATUS_SUCCEEDED:
+            self.consecutive_rejections = 0
             goal_name = 'fallback' if self.current_goal_is_fallback else 'spiral'
             self.get_logger().info(f'Nav2 reached {goal_name} goal at theta={self.theta:.3f}')
             self.advance_spiral()
@@ -197,9 +244,33 @@ class SpiralController(Node):
         self.send_fallback_goal()
 
     def advance_spiral(self):
-        self.theta += self.theta_step
+        if self.current_goal_is_fallback or not self.current_batch:
+            self.theta += self.theta_step_for_radius(self.radius_for_theta(self.theta))
+        else:
+            self.theta = self.current_batch[-1][4] + self.theta_step_for_radius(self.current_batch[-1][3])
+
         self.current_spiral_goal = None
+        self.current_batch = []
         self.fallback_attempts = 0
+
+    def record_goal_rejection(self):
+        self.consecutive_rejections += 1
+
+        if self.consecutive_rejections < self.max_consecutive_rejections:
+            return
+
+        self.get_logger().error(
+            'Nav2 is rejecting every goal before planning starts. Stopping spiral '
+            'instead of skipping through waypoints.'
+        )
+        self.get_logger().error(
+            f'Check Nav2 lifecycle state, goal_frame, /start_spiral coordinates, '
+            f'use_sim_time, and whether the first goal is inside an inflated obstacle. '
+            f'Last state: theta={self.theta:.3f}, centre=({self.center_x:.3f}, '
+            f'{self.center_y:.3f}), goal_frame={self.goal_frame}, '
+            f'stamp_goals={self.stamp_goals}, action={self.nav2_action_name}'
+        )
+        self.finish_spiral()
 
     def finish_spiral(self):
         if self.finished:
@@ -245,7 +316,15 @@ class SpiralController(Node):
         spiral_theta = max(theta - self.initial_circle_angle, 0.0)
         return self.min_radius + self.k * spiral_theta
 
+    def theta_step_for_radius(self, radius):
+        radius = max(radius, 0.001)
+        spacing_step = self.waypoint_spacing / radius
+        return min(max(self.theta_step, spacing_step), self.max_theta_step)
+
     def spiral_tangent_yaw(self, theta, radius):
+        if self.yaw_mode == 'none':
+            return self.current_yaw if self.current_yaw is not None else 0.0
+
         if theta < self.initial_circle_angle:
             return self.angle_normalise(theta + math.pi / 2.0)
 
@@ -256,7 +335,8 @@ class SpiralController(Node):
     def make_pose_stamped(self, x, y, yaw):
         pose = PoseStamped()
         pose.header.frame_id = self.goal_frame
-        pose.header.stamp = self.get_clock().now().to_msg()
+        if self.stamp_goals:
+            pose.header.stamp = self.get_clock().now().to_msg()
         pose.pose.position.x = float(x)
         pose.pose.position.y = float(y)
         pose.pose.position.z = 0.0
@@ -324,6 +404,12 @@ class SpiralController(Node):
             self.get_logger().warn('Start trigger ignored: loop_spacing_widths must be > 0.0')
             return
 
+        if self.goal_frame == 'map':
+            self.get_logger().warn(
+                'Spiral goals are being sent in the map frame. Make sure /start_spiral '
+                'centre coordinates are also in map, not odom.'
+            )
+
         if not self.nav_client.wait_for_server(timeout_sec=1.0):
             self.get_logger().warn(
                 f'Start trigger ignored: Nav2 action server not available: {self.nav2_action_name}'
@@ -342,7 +428,9 @@ class SpiralController(Node):
         self.finished = False
         self.theta = 0.0
         self.current_spiral_goal = None
+        self.current_batch = []
         self.fallback_attempts = 0
+        self.consecutive_rejections = 0
 
         self.get_logger().info('Spiral Nav2 waypoint movement started')
         self.get_logger().info(
