@@ -28,6 +28,7 @@ setup(
     entry_points={
         'console_scripts': [
             'spiral_controller = macadamia_challenge.spiral_controller:main',
+            'spiral_controller_nav2_waypoint = macadamia_challenge.spiral_controller_nav2_waypoint:main',
         ],
     },
 )
