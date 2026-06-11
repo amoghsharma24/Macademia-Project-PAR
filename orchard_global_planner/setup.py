@@ -25,6 +25,7 @@ setup(
     entry_points={
         'console_scripts': [
             'planner_node = orchard_global_planner.planner_node:main',
+            'navigator_node = orchard_global_planner.navigator_node:main',
         ],
     },
 )
