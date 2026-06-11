@@ -27,7 +27,7 @@ class PlannerNode(Node):
         )
 
         self.robot_radius = 0.16 # metres, according to the internet
-        self.safety_margin = 0.09 # just as a buffer
+        self.safety_margin = 0.04 # just as a buffer
 
         self.map_data = None
 
