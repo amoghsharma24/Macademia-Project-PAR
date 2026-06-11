@@ -26,6 +26,9 @@ class PlannerNode(Node):
             10
         )
 
+        self.robot_radius = 0.16 # metres, according to the internet
+        self.safety_margin = 0.09 # just as a buffer
+
         self.map_data = None
 
         self.current_x = None
@@ -160,13 +163,30 @@ class PlannerNode(Node):
         if map_y < 0 or map_y >= height:
             return False
 
-        index = map_y * width + map_x
+        clearance_radius = self.robot_radius + self.safety_margin # for accepting states that safely fit the rosbot
+        cell_radius = int(clearance_radius / resolution)
 
-        occupancy = self.map_data.data[index]
+        for dy in range(-cell_radius, cell_radius + 1):
+            for dx in range(-cell_radius, cell_radius + 1):
 
-        # Occupied or unknown
-        if occupancy > 50 or occupancy == -1:
-            return False
+                # circular footprint instead of square footprint
+                if dx * dx + dy * dy > cell_radius * cell_radius:
+                    continue
+
+                check_x = map_x + dx
+                check_y = map_y + dy
+
+                if check_x < 0 or check_x >= width:
+                    return False
+
+                if check_y < 0 or check_y >= height:
+                    return False
+
+                check_index = check_y * width + check_x
+                occupancy = self.map_data.data[check_index]
+
+                if occupancy > 50 or occupancy == -1:
+                    return False
 
         return True
 
