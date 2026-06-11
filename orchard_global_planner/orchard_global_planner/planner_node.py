@@ -223,7 +223,8 @@ class PlannerNode(Node):
         bounds.setHigh(1, origin_y + map_height_m)
 
         space.setBounds(bounds)
-
+        space.setLongestValidSegmentFraction(0.005)
+        
         ss = og.SimpleSetup(space)
 
         ss.setStateValidityChecker(self.is_state_valid)
