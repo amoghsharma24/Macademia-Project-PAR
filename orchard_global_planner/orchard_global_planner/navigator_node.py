@@ -38,7 +38,7 @@ class NavigatorNode(Node):
             f"Received path with {len(msg.poses)} poses"
         )
 
-        if not self.client.wait_for_server(timerout_sec=15.0):
+        if not self.client.wait_for_server(timeout_sec=15.0):
             self.get_logger().error(
                 "NavigateThroughPoses action server not available"
             )
@@ -78,7 +78,7 @@ class NavigatorNode(Node):
         )
 
         self.goal_sent = False
-        
+
 def main(args=None):
 
     rclpy.init(args=args)
