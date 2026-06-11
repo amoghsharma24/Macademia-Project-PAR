@@ -83,11 +83,11 @@ class PlannerNode(Node):
     
     def try_plan(self):
     
-        self.get_logger().info(
-            f"try_plan map={self.map_data is not None} "
-            f"odom={self.current_x is not None} "
-            f"goal={self.goal_x is not None}"
-        )
+#        self.get_logger().info(
+#            f"try_plan map={self.map_data is not None} "
+#            f"odom={self.current_x is not None} "
+#            f"goal={self.goal_x is not None}"
+#        )
 
         if self.map_data is None:
             return
@@ -103,7 +103,7 @@ class PlannerNode(Node):
         self.plan_demo_path()
     
     def map_callback(self, msg):
-        self.get_logger().info("MAP CALLBACK")
+#        self.get_logger().info("MAP CALLBACK")
         self.map_data = msg
 
         if not self.map_received:
@@ -113,7 +113,7 @@ class PlannerNode(Node):
             self.map_received = True
     
     def odom_callback(self, msg): 
-        self.get_logger().info("ODOM CALLBACK")
+#        self.get_logger().info("ODOM CALLBACK")
         self.current_x = msg.pose.pose.position.x
         self.current_y = msg.pose.pose.position.y
 
@@ -123,7 +123,7 @@ class PlannerNode(Node):
         self.try_plan()
 
     def goal_callback(self, msg):
-        self.get_logger().info("GOAL CALLBACK")
+#        self.get_logger().info("GOAL CALLBACK")
         self.goal_x = msg.pose.position.x
         self.goal_y = msg.pose.position.y
 
