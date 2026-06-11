@@ -224,7 +224,7 @@ class PlannerNode(Node):
 
         space.setBounds(bounds)
         space.setLongestValidSegmentFraction(0.005)
-        
+
         ss = og.SimpleSetup(space)
 
         ss.setStateValidityChecker(self.is_state_valid)
@@ -251,7 +251,7 @@ class PlannerNode(Node):
 
         ss.setStartAndGoalStates(start, goal)
 
-        planner = og.RRTConnect(
+        planner = og.RRTstar(
             ss.getSpaceInformation()
         )
 
