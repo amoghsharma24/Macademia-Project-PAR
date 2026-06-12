@@ -31,6 +31,7 @@ setup(
             'nav2_waypoint_sender_node = macadamia_challenge.waypoint_provider.nav2_waypoint_sender_node:main',
             'orchard_control_node = macadamia_challenge.controll.orchard_state_controller:main',
             'spiral_controller = macadamia_challenge.tree_behaviour.spiral_controller:main',
+            'spiral_nav2_controller = macadamia_challenge.tree_behaviour.spiral_controller_nav2_waypoint:main',
             'tree_mapper_node = macadamia_challenge.tree_detection.tree_mapper_node:main',
         ],
     },

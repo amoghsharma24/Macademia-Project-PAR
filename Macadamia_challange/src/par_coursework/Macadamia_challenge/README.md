@@ -46,7 +46,7 @@ source install/setup.bash
 There is one launch file:
 
 ```bash
-ros2 launch macadamia_challenge tree_waypoint_planner.launch.py
+ros2 launch macadamia_challenge macadamia_challange.launch.py
 ```
 
 By default, it starts the main mission components:
@@ -54,12 +54,12 @@ By default, it starts the main mission components:
 - `tree_waypoint_planner_node`
 - `nav2_waypoint_sender_node`
 - `orchard_control_node`
-- `spiral_controller`
+- `spiral_controller` in basic steering mode
 
 Optional test/helper nodes can be enabled with launch arguments:
 
 ```bash
-ros2 launch macadamia_challenge tree_waypoint_planner.launch.py \
+ros2 launch macadamia_challenge macadamia_challange.launch.py \
   use_fake_trees:=true \
   use_boundary_filter:=true \
   use_memory:=true
@@ -68,7 +68,7 @@ ros2 launch macadamia_challenge tree_waypoint_planner.launch.py \
 To use the occupancy-map tree detector instead of hard-coded trees:
 
 ```bash
-ros2 launch macadamia_challenge tree_waypoint_planner.launch.py \
+ros2 launch macadamia_challenge macadamia_challange.launch.py \
   use_tree_mapper:=true \
   use_hardcoded_trees:=false
 ```
@@ -76,17 +76,24 @@ ros2 launch macadamia_challenge tree_waypoint_planner.launch.py \
 To route detected trees through the memory node first:
 
 ```bash
-ros2 launch macadamia_challenge tree_waypoint_planner.launch.py \
+ros2 launch macadamia_challenge macadamia_challange.launch.py \
   use_tree_mapper:=true \
   use_memory:=true \
   use_hardcoded_trees:=false \
   tree_mapper_output_topic:=/trees
 ```
 
+The spiral behaviour defaults to direct steering on `/cmd_vel`. To use the Nav2 waypoint spiral instead:
+
+```bash
+ros2 launch macadamia_challenge macadamia_challange.launch.py \
+  spiral_mode:=nav2
+```
+
 For a waypoint-stack-only test without the orchard controller or spiral controller:
 
 ```bash
-ros2 launch macadamia_challenge tree_waypoint_planner.launch.py \
+ros2 launch macadamia_challenge macadamia_challange.launch.py \
   use_orchard_controller:=false \
   use_spiral_controller:=false \
   use_memory:=true \
@@ -125,8 +132,14 @@ ros2 launch macadamia_challenge tree_waypoint_planner.launch.py \
 | `spiral_min_radius` | `0.25` | Starting spiral radius around a tree. |
 | `spiral_max_radius` | `1.4` | Radius where spiral behaviour finishes. |
 | `spiral_loop_spacing` | `1.0` | Spiral loop spacing in robot-width units. |
+| `spiral_mode` | `steering` | Spiral implementation: `steering` for direct `/cmd_vel`, or `nav2` for Nav2 waypoint batches. |
 | `spiral_linear_speed` | `0.125` | Linear speed during spiral steering. |
 | `spiral_kp_heading` | `1.5` | Heading proportional gain for spiral steering. |
+| `spiral_nav2_action_name` | `navigate_through_poses` | Nav2 action used by the Nav2 spiral. |
+| `spiral_nav2_goal_frame` | `map` | Goal frame used by the Nav2 spiral. |
+| `spiral_nav2_odom_topic` | `/odometry/filtered` | Odometry topic used by the Nav2 spiral. |
+| `spiral_nav2_waypoint_spacing` | `0.35` | Spacing between generated Nav2 spiral waypoints. |
+| `spiral_nav2_batch_size` | `8` | Number of Nav2 spiral waypoints sent per batch. |
 
 ## Main Nodes
 
@@ -196,11 +209,25 @@ ros2 topic pub --once /orchard_controller/start std_msgs/msg/Empty "{}"
 
 ### `spiral_controller`
 
-Runs a simple steering spiral around the selected tree. It is started by the orchard controller on `/start_spiral` and stopped on `/stop_spiral`.
+Runs a simple steering spiral around the selected tree. It is the default when `spiral_mode:=steering`. It is started by the orchard controller on `/start_spiral` and stopped on `/stop_spiral`.
 
 Publishes:
 
 - `/cmd_vel`
+- `/spiral_markers`
+
+Subscribes:
+
+- `/odometry/filtered`
+- `/start_spiral`
+- `/stop_spiral`
+
+### `spiral_nav2_controller`
+
+Runs the spiral by sending batches of poses to Nav2 `NavigateThroughPoses`. Enable it with `spiral_mode:=nav2`.
+
+Publishes:
+
 - `/spiral_markers`
 
 Subscribes:
@@ -265,3 +292,4 @@ Publishes:
 | `/start_spiral` | `std_msgs/msg/Float32MultiArray` | Starts spiral around `[center_x, center_y, min_radius, max_radius, loop_spacing]`. |
 | `/stop_spiral` | `std_msgs/msg/Empty` | Stops spiral motion. |
 | `/cmd_vel` | `geometry_msgs/msg/TwistStamped` | Velocity command from spiral controller. |
+

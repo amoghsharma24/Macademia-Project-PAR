@@ -7,7 +7,7 @@ from nav2_msgs.action import NavigateThroughPoses
 from nav_msgs.msg import Odometry
 from rclpy.action import ActionClient
 from rclpy.node import Node
-from std_msgs.msg import Float32MultiArray
+from std_msgs.msg import Empty, Float32MultiArray
 from visualization_msgs.msg import Marker
 
 
@@ -72,6 +72,12 @@ class SpiralController(Node):
             Float32MultiArray,
             '/start_spiral',
             self.start_callback,
+            10
+        )
+        self.stop_sub = self.create_subscription(
+            Empty,
+            '/stop_spiral',
+            self.stop_callback,
             10
         )
 
@@ -443,6 +449,17 @@ class SpiralController(Node):
             f'Start trigger received at robot pose: '
             f'x={self.current_x:.3f}, y={self.current_y:.3f}, yaw={self.current_yaw:.3f}'
         )
+
+    def stop_callback(self, _msg):
+        was_started = self.started or self.goal_active
+
+        self.started = False
+        self.finished = False
+        self.cancel_active_goal()
+
+        if was_started:
+            self.get_logger().info('Spiral Nav2 waypoint movement stopped')
+            self.stop_robot()
 
     def loop_spacing_metres(self):
         return self.loop_spacing * self.robot_width

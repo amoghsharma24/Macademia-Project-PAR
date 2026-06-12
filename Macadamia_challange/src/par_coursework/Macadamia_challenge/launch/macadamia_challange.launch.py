@@ -1,7 +1,7 @@
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.conditions import IfCondition
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 
 
@@ -43,8 +43,14 @@ def generate_launch_description():
         DeclareLaunchArgument('spiral_min_radius', default_value='0.25'),
         DeclareLaunchArgument('spiral_max_radius', default_value='1.4'),
         DeclareLaunchArgument('spiral_loop_spacing', default_value='1.0'),
+        DeclareLaunchArgument('spiral_mode', default_value='steering'),
         DeclareLaunchArgument('spiral_linear_speed', default_value='0.125'),
         DeclareLaunchArgument('spiral_kp_heading', default_value='1.5'),
+        DeclareLaunchArgument('spiral_nav2_action_name', default_value='navigate_through_poses'),
+        DeclareLaunchArgument('spiral_nav2_goal_frame', default_value='map'),
+        DeclareLaunchArgument('spiral_nav2_odom_topic', default_value='/odometry/filtered'),
+        DeclareLaunchArgument('spiral_nav2_waypoint_spacing', default_value='0.35'),
+        DeclareLaunchArgument('spiral_nav2_batch_size', default_value='8'),
 
         Node(
             package='macadamia_challenge',
@@ -141,15 +147,38 @@ def generate_launch_description():
         Node(
             package='macadamia_challenge',
             executable='spiral_controller',
-            name='spiral_controller',
+            name='spiral_steering_controller',
             output='screen',
-            condition=IfCondition(LaunchConfiguration('use_spiral_controller')),
+            condition=IfCondition(PythonExpression([
+                "'", LaunchConfiguration('use_spiral_controller'), "' == 'true' and ",
+                "'", LaunchConfiguration('spiral_mode'), "' == 'steering'",
+            ])),
             parameters=[
                 {'min_radius': LaunchConfiguration('spiral_min_radius')},
                 {'max_radius': LaunchConfiguration('spiral_max_radius')},
                 {'loop_spacing': LaunchConfiguration('spiral_loop_spacing')},
                 {'linear_speed': LaunchConfiguration('spiral_linear_speed')},
                 {'kp_heading': LaunchConfiguration('spiral_kp_heading')},
+            ],
+        ),
+        Node(
+            package='macadamia_challenge',
+            executable='spiral_nav2_controller',
+            name='spiral_nav2_controller',
+            output='screen',
+            condition=IfCondition(PythonExpression([
+                "'", LaunchConfiguration('use_spiral_controller'), "' == 'true' and ",
+                "'", LaunchConfiguration('spiral_mode'), "' == 'nav2'",
+            ])),
+            parameters=[
+                {'min_radius': LaunchConfiguration('spiral_min_radius')},
+                {'max_radius': LaunchConfiguration('spiral_max_radius')},
+                {'loop_spacing': LaunchConfiguration('spiral_loop_spacing')},
+                {'nav2_action_name': LaunchConfiguration('spiral_nav2_action_name')},
+                {'goal_frame': LaunchConfiguration('spiral_nav2_goal_frame')},
+                {'odom_topic': LaunchConfiguration('spiral_nav2_odom_topic')},
+                {'waypoint_spacing': LaunchConfiguration('spiral_nav2_waypoint_spacing')},
+                {'batch_size': LaunchConfiguration('spiral_nav2_batch_size')},
             ],
         ),
     ])
