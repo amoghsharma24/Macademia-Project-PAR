@@ -56,6 +56,7 @@ class OrchardControlNode(Node):
         self.return_goal_succeeded = False
 
         self.state_pub = self.create_publisher(String, '/orchard_controller/state', 10)
+        self.tree_generator_start_pub = self.create_publisher(Empty, '/tree_generator_start', 10)
         self.tree_memory_start_pub = self.create_publisher(Empty, '/tree_memory_start', 10)
         self.tree_waypoint_start_pub = self.create_publisher(Empty, '/tree_waypoint_start', 10)
         self.tree_waypoint_stop_pub = self.create_publisher(Empty, '/tree_waypoint_stop', 10)
@@ -180,6 +181,7 @@ class OrchardControlNode(Node):
         self.return_goal_succeeded = False
 
         self.publish_empty(self.reset_visited_pub)
+        self.publish_empty(self.tree_generator_start_pub)
         self.publish_empty(self.tree_memory_start_pub)
         self.publish_empty(self.tree_waypoint_start_pub)
         self.publish_empty(self.nav2_sender_stop_pub)
@@ -187,6 +189,7 @@ class OrchardControlNode(Node):
         self.change_state(MissionState.DETECTING_TREES)
 
     def detect_trees(self):
+        self.publish_empty(self.tree_generator_start_pub)
         self.publish_empty(self.tree_memory_start_pub)
         self.publish_empty(self.tree_waypoint_start_pub)
 

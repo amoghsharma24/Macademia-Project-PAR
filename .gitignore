@@ -20,3 +20,16 @@ ai_folder/context/node graph.png
 ai_folder/context/par_project_2026.pdf
 ai_folder/context/states.png
 ai_folder/planning/spiral_waypoint_path_planning.md
+
+# Python-generated files
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# python versioning
+.python-version*
+pyproject.toml*
+uv*

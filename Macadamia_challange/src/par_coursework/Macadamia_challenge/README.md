@@ -5,6 +5,7 @@ ROS 2 Python package for the macadamia orchard waypoint and tree-behaviour demo.
 The package combines:
 
 - waypoint generation around detected or hard-coded trees
+- occupancy-map tree detection
 - optional fake tree publishing for testing
 - optional tree memory for smoothing repeated detections
 - optional fake orchard boundary map filtering
@@ -21,6 +22,8 @@ macadamia_challenge/
   tree_behaviour/
     spiral_controller.py
     spiral_controller_nav2_waypoint.py
+  tree_detection/
+    tree_mapper_node.py
   waypoint_provider/
     fake_boundary_filter_node.py
     fake_tree_publisher_node.py
@@ -62,6 +65,24 @@ ros2 launch macadamia_challenge tree_waypoint_planner.launch.py \
   use_memory:=true
 ```
 
+To use the occupancy-map tree detector instead of hard-coded trees:
+
+```bash
+ros2 launch macadamia_challenge tree_waypoint_planner.launch.py \
+  use_tree_mapper:=true \
+  use_hardcoded_trees:=false
+```
+
+To route detected trees through the memory node first:
+
+```bash
+ros2 launch macadamia_challenge tree_waypoint_planner.launch.py \
+  use_tree_mapper:=true \
+  use_memory:=true \
+  use_hardcoded_trees:=false \
+  tree_mapper_output_topic:=/trees
+```
+
 For a waypoint-stack-only test without the orchard controller or spiral controller:
 
 ```bash
@@ -79,6 +100,7 @@ ros2 launch macadamia_challenge tree_waypoint_planner.launch.py \
 | --- | --- | --- |
 | `frame_id` | `odom` | Frame used by published poses and markers. |
 | `use_fake_trees` | `false` | Launches hard-coded fake tree publisher. |
+| `use_tree_mapper` | `false` | Launches occupancy-map tree detector. |
 | `use_boundary_filter` | `false` | Launches fake rectangular occupancy-map boundary filter. |
 | `use_memory` | `false` | Launches tree memory node for smoothing `/trees` into `/detected_trees`. |
 | `use_nav2_sender` | `true` | Launches Nav2 waypoint sender. |
@@ -96,6 +118,10 @@ ros2 launch macadamia_challenge tree_waypoint_planner.launch.py \
 | `approach_distance` | `0.6` | Distance from tree to generated approach waypoint. |
 | `min_x`, `max_x`, `min_y`, `max_y` | `0.0`, `5.0`, `-2.5`, `2.5` | Rectangle used by fake boundary filter. |
 | `outside_value` | `0` | Occupancy value written outside the fake boundary. |
+| `tree_mapper_input_map_topic` | `/map` | Occupancy grid input for tree detection. |
+| `tree_mapper_output_topic` | `/detected_trees` | Tree detector output topic. Use `/trees` when routing through tree memory. |
+| `tree_mapper_min_radius` | `0.05` | Minimum detected contour radius in metres. |
+| `tree_mapper_max_radius` | `0.5` | Maximum detected contour radius in metres. |
 | `spiral_min_radius` | `0.25` | Starting spiral radius around a tree. |
 | `spiral_max_radius` | `1.4` | Radius where spiral behaviour finishes. |
 | `spiral_loop_spacing` | `1.0` | Spiral loop spacing in robot-width units. |
@@ -193,6 +219,19 @@ Publishes:
 - `/tracked_tree_markers`
 - `/tree_memory_status`
 
+### `tree_mapper_node`
+
+Detects tree-like circular occupied regions from an occupancy grid map. The orchard controller triggers it on `/tree_generator_start` during the detection state.
+
+Subscribes:
+
+- `/map` by default, configurable with `tree_mapper_input_map_topic`
+- `/tree_generator_start`
+
+Publishes:
+
+- `/detected_trees` by default, configurable with `tree_mapper_output_topic`
+
 ### `fake_tree_publisher_node`
 
 Publishes hard-coded tree positions for testing.
@@ -219,7 +258,7 @@ Publishes:
 
 | Topic | Type | Purpose |
 | --- | --- | --- |
-| `/trees` | `geometry_msgs/msg/PoseArray` | Raw tree detections from an external detector. |
+| `/trees` | `geometry_msgs/msg/PoseArray` | Raw tree detections, usually for `tree_memory_node`. |
 | `/detected_trees` | `geometry_msgs/msg/PoseArray` | Tree list consumed by the waypoint planner. |
 | `/selected_tree_waypoint` | `geometry_msgs/msg/PoseStamped` | Current waypoint sent to Nav2. |
 | `/reached_tree_waypoint` | `std_msgs/msg/Bool` | Nav2 sender reports successful arrival. |

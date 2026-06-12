@@ -10,6 +10,7 @@ def generate_launch_description():
         DeclareLaunchArgument('frame_id', default_value='odom'),
 
         DeclareLaunchArgument('use_fake_trees', default_value='false'),
+        DeclareLaunchArgument('use_tree_mapper', default_value='true'),
         DeclareLaunchArgument('use_boundary_filter', default_value='false'),
         DeclareLaunchArgument('use_memory', default_value='false'),
         DeclareLaunchArgument('use_nav2_sender', default_value='true'),
@@ -21,7 +22,7 @@ def generate_launch_description():
         DeclareLaunchArgument('auto_start', default_value='false'),
         DeclareLaunchArgument('nav2_auto_send', default_value='true'),
 
-        DeclareLaunchArgument('use_hardcoded_trees', default_value='true'),
+        DeclareLaunchArgument('use_hardcoded_trees', default_value='false'),
         DeclareLaunchArgument('waypoint_mode', default_value='towards_centerline'),
         DeclareLaunchArgument('waypoint_offset_x', default_value='0.0'),
         DeclareLaunchArgument('waypoint_offset_y', default_value='-0.6'),
@@ -33,6 +34,11 @@ def generate_launch_description():
         DeclareLaunchArgument('min_y', default_value='-2.5'),
         DeclareLaunchArgument('max_y', default_value='2.5'),
         DeclareLaunchArgument('outside_value', default_value='0'),
+
+        DeclareLaunchArgument('tree_mapper_input_map_topic', default_value='/map'),
+        DeclareLaunchArgument('tree_mapper_output_topic', default_value='/detected_trees'),
+        DeclareLaunchArgument('tree_mapper_min_radius', default_value='0.05'),
+        DeclareLaunchArgument('tree_mapper_max_radius', default_value='0.5'),
 
         DeclareLaunchArgument('spiral_min_radius', default_value='0.25'),
         DeclareLaunchArgument('spiral_max_radius', default_value='1.4'),
@@ -64,6 +70,20 @@ def generate_launch_description():
                 {'max_y': LaunchConfiguration('max_y')},
                 {'outside_value': LaunchConfiguration('outside_value')},
                 {'start_active': LaunchConfiguration('start_active')},
+            ],
+        ),
+        Node(
+            package='macadamia_challenge',
+            executable='tree_mapper_node',
+            name='tree_mapper_node',
+            output='screen',
+            condition=IfCondition(LaunchConfiguration('use_tree_mapper')),
+            parameters=[
+                {'input_map_topic': LaunchConfiguration('tree_mapper_input_map_topic')},
+                {'output_trees_topic': LaunchConfiguration('tree_mapper_output_topic')},
+                {'frame_id': LaunchConfiguration('frame_id')},
+                {'min_radius': LaunchConfiguration('tree_mapper_min_radius')},
+                {'max_radius': LaunchConfiguration('tree_mapper_max_radius')},
             ],
         ),
         Node(

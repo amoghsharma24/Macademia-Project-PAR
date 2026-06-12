@@ -13,6 +13,7 @@ setup(
     data_files=[
         ('share/ament_index/resource_index/packages', ['resource/' + package_name]),
         (os.path.join('share', package_name, 'launch'), glob('launch/*.launch.py')),
+        (os.path.join('share', package_name, 'maps'), glob('macadamia_challenge/maps/*')),
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name, ['README.md']),
     ],
@@ -30,6 +31,7 @@ setup(
             'nav2_waypoint_sender_node = macadamia_challenge.waypoint_provider.nav2_waypoint_sender_node:main',
             'orchard_control_node = macadamia_challenge.controll.orchard_state_controller:main',
             'spiral_controller = macadamia_challenge.tree_behaviour.spiral_controller:main',
+            'tree_mapper_node = macadamia_challenge.tree_detection.tree_mapper_node:main',
         ],
     },
 )
