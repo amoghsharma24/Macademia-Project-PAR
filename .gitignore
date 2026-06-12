@@ -13,3 +13,10 @@ __pycache__/
 *.autosave
 *~
 .#*
+chat_gpt.md
+ai_folder/CONTEXT.md
+ai_folder/context/CONTEXT.md
+ai_folder/context/node graph.png
+ai_folder/context/par_project_2026.pdf
+ai_folder/context/states.png
+ai_folder/planning/spiral_waypoint_path_planning.md

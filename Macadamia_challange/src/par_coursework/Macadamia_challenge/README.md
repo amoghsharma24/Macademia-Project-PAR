@@ -1,317 +1,228 @@
-## Waypoint Stack Launch
+# Macadamia Challenge
 
-Build and source the package, then launch the complete waypoint subsystem:
+ROS 2 Python package for the macadamia orchard waypoint and tree-behaviour demo.
+
+The package combines:
+
+- waypoint generation around detected or hard-coded trees
+- optional fake tree publishing for testing
+- optional tree memory for smoothing repeated detections
+- optional fake orchard boundary map filtering
+- Nav2 waypoint sending
+- an orchard mission state controller
+- a spiral steering behaviour around each selected tree
+
+## Package Layout
+
+```text
+macadamia_challenge/
+  controll/
+    orchard_state_controller.py
+  tree_behaviour/
+    spiral_controller.py
+    spiral_controller_nav2_waypoint.py
+  waypoint_provider/
+    fake_boundary_filter_node.py
+    fake_tree_publisher_node.py
+    nav2_waypoint_sender_node.py
+    tree_memory_node.py
+    tree_waypoint_planner_node.py
+```
+
+## Build
+
+From the workspace containing `src/par_coursework/Macadamia_challenge`:
 
 ```bash
-colcon build --packages-select tree_waypoint_planner
+colcon build --packages-select macadamia_challenge
 source install/setup.bash
-ros2 launch tree_waypoint_planner tree_waypoint_stack.launch.py
 ```
 
-For a visual test using the planner's hard-coded trees without the boundary filter or tree memory:
+## Universal Launch
+
+There is one launch file:
 
 ```bash
-ros2 launch tree_waypoint_planner tree_waypoint_stack.launch.py \
-  use_boundary_filter:=false \
-  use_memory:=false \
-  use_hardcoded_trees:=true
+ros2 launch macadamia_challenge tree_waypoint_planner.launch.py
 ```
 
-For live detections published on `/trees`, enable memory and disable hard-coded trees:
+By default, it starts the main mission components:
+
+- `tree_waypoint_planner_node`
+- `nav2_waypoint_sender_node`
+- `orchard_control_node`
+- `spiral_controller`
+
+Optional test/helper nodes can be enabled with launch arguments:
 
 ```bash
-ros2 launch tree_waypoint_planner tree_waypoint_stack.launch.py \
+ros2 launch macadamia_challenge tree_waypoint_planner.launch.py \
+  use_fake_trees:=true \
+  use_boundary_filter:=true \
+  use_memory:=true
+```
+
+For a waypoint-stack-only test without the orchard controller or spiral controller:
+
+```bash
+ros2 launch macadamia_challenge tree_waypoint_planner.launch.py \
+  use_orchard_controller:=false \
+  use_spiral_controller:=false \
   use_memory:=true \
+  use_boundary_filter:=true \
   use_hardcoded_trees:=false
 ```
 
-The boundary filter requires an occupancy grid on `/map`. Disable it with
-`use_boundary_filter:=false` when no map is available.
+## Launch Arguments
 
-`auto_send` defaults to `false` for safety. Set `auto_send:=true` only when the
-Nav2 action server is ready and automatic waypoint execution is intended.
-
-## Controller start/stop interface
-
-controller publishes start and stop messages. Each node listens to its
-controller topics, enables or disables its normal data processing, and publishes
-its current status.
-
-| Node | Start topic | Stop topic | Status topic |
-| --- | --- | --- | --- |
-| `fake_boundary_filter_node` | `/boundary_filter_start` | `/boundary_filter_stop` | `/boundary_filter_status` |
-| `tree_memory_node` | `/tree_memory_start` | `/tree_memory_stop` | `/tree_memory_status` |
-| `tree_waypoint_planner_node` | `/tree_waypoint_start` | `/tree_waypoint_stop` | `/tree_waypoint_status` |
-| `nav2_waypoint_sender_node` | `/nav2_sender_start` | `/nav2_sender_stop` | `/nav2_waypoint_status` |
-
-All four nodes provide a `start_active` parameter with a default of `true`.
-When stopped, the nodes continue listening for controller messages and publishing
-status where practical, but do not publish their normal output data. The Nav2
-sender does not send new goals while stopped. `auto_send` remains `false` by
-default for safety.
-
-Build the package:
-
-```bash
-cd /home/rmitaiil/Macademia-Project-PAR/Node4-Tree_Waypoint
-colcon build --packages-select tree_waypoint_planner
-source install/setup.bash
-```
-
-Run the stack initially stopped:
-
-```bash
-ros2 launch tree_waypoint_planner tree_waypoint_stack.launch.py \
-  use_hardcoded_trees:=true \
-  use_memory:=false \
-  use_boundary_filter:=false \
-  frame_id:=map \
-  auto_send:=false \
-  start_active:=false
-```
-
-Echo planner and Nav2 sender status:
-
-```bash
-ros2 topic echo /tree_waypoint_status
-ros2 topic echo /nav2_waypoint_status
-```
-
-Start and stop the planner:
-
-```bash
-ros2 topic pub --once /tree_waypoint_start std_msgs/msg/Empty "{}"
-ros2 topic pub --once /tree_waypoint_stop std_msgs/msg/Empty "{}"
-```
-
-Start and stop the Nav2 sender:
-
-```bash
-ros2 topic pub --once /nav2_sender_start std_msgs/msg/Empty "{}"
-ros2 topic pub --once /nav2_sender_stop std_msgs/msg/Empty "{}"
-```
-
-## ROS2 Topics
-
-The `tree_waypoint_planner` package uses ROS2 topics to connect the tree detection, waypoint planning, RViz visualisation, and future Nav2 handoff parts of the system.
-
-### Published Topics
-
-The main waypoint planner node publishes:
-
-* `/tree_markers` (`visualization_msgs/msg/MarkerArray`)
-  RViz markers showing the detected or hard-coded tree positions as green cylinders.
-
-* `/tree_waypoint_markers` (`visualization_msgs/msg/MarkerArray`)
-  RViz markers showing the generated approach waypoints as orange arrows.
-
-* `/tree_waypoints` (`geometry_msgs/msg/PoseArray`)
-  A list of all generated approach waypoints, with one waypoint created for each tree.
-
-* `/selected_tree_waypoint` (`geometry_msgs/msg/PoseStamped`)
-  The currently selected target waypoint. This is the single waypoint intended to be sent to Nav2.
-
-* `/selected_tree_waypoint_marker` (`visualization_msgs/msg/Marker`)
-  RViz marker showing the currently selected waypoint more clearly.
-
-* `/tree_waypoint_status` (`std_msgs/msg/String`)
-  Planner state updates such as detected tree count, generated waypoint count, selected index, visited-index events, and completion.
-
-The Nav2 sender node publishes:
-
-* `/nav2_waypoint_status` (`std_msgs/msg/String`)
-  A simple status topic showing whether the Nav2 sender is waiting, has received a waypoint, has sent a goal, or has completed/failed a goal.
-
-* `/reached_tree_waypoint` (`std_msgs/msg/Bool`)
-  Publishes `True` when Nav2 successfully reaches the selected tree waypoint. This can later be used to trigger the tree spiral behaviour.
-
-### Subscribed Topics
-
-The waypoint planner node subscribes to:
-
-* `/detected_trees` (`geometry_msgs/msg/PoseArray`)
-  Tree positions from the detection system. For testing, this can also come from the fake tree publisher node.
-
-* `/mark_tree_visited` (`std_msgs/msg/Int32`)
-  Marks a nonnegative waypoint index as visited.
-
-* `/reset_visited_trees` (`std_msgs/msg/Empty`)
-  Clears all visited waypoint indices.
-
-The Nav2 sender node subscribes to:
-
-* `/selected_tree_waypoint` (`geometry_msgs/msg/PoseStamped`)
-  The selected waypoint from the planner, which can be forwarded to Nav2 when `auto_send` is enabled.
-
-## Tree Memory Node
-
-`tree_memory_node` sits between the raw tree mapper and the waypoint planner. It remembers tree detections over time, merges detections within a configurable distance, and smooths repeated observations so the planner receives a stable tree list instead of noisy raw positions.
-
-### Topics
-
-* Subscribes to `/trees` (`geometry_msgs/msg/PoseArray`)
-  Raw tree detections, including the output topic currently used by Joshua's tree mapper.
-
-* Publishes `/detected_trees` (`geometry_msgs/msg/PoseArray`)
-  Smoothed, remembered tree positions for `tree_waypoint_planner_node`.
-
-* Publishes `/tracked_tree_markers` (`visualization_msgs/msg/MarkerArray`)
-  Green-blue cylinder markers for the tracked tree positions in RViz.
-
-The node deletes obsolete marker IDs if the published tracked-tree count decreases, preventing stale cylinders from remaining in RViz.
-
-### Parameters
-
-| Parameter | Default | Description |
+| Argument | Default | Purpose |
 | --- | --- | --- |
-| `frame_id` | `odom` | Frame used for output poses and markers. |
-| `merge_distance` | `0.4` | Maximum Euclidean distance for merging a detection into a tracked tree. |
-| `smoothing_alpha` | `0.5` | Weight applied to each new detection during position smoothing. |
-| `min_observations` | `1` | Observations required before publishing a tracked tree. |
-| `publish_rate_hz` | `1.0` | Output publication rate. |
-| `marker_radius` | `0.18` | RViz cylinder radius in metres. |
-| `marker_height` | `0.6` | RViz cylinder height in metres. |
+| `frame_id` | `odom` | Frame used by published poses and markers. |
+| `use_fake_trees` | `false` | Launches hard-coded fake tree publisher. |
+| `use_boundary_filter` | `false` | Launches fake rectangular occupancy-map boundary filter. |
+| `use_memory` | `false` | Launches tree memory node for smoothing `/trees` into `/detected_trees`. |
+| `use_nav2_sender` | `true` | Launches Nav2 waypoint sender. |
+| `use_orchard_controller` | `true` | Launches mission state controller. |
+| `use_spiral_controller` | `true` | Launches spiral tree-behaviour controller. |
+| `start_active` | `true` | Starts planner/helper nodes active. |
+| `nav2_start_active` | `false` | Starts Nav2 sender active. Usually controlled by orchard controller. |
+| `auto_start` | `false` | Starts orchard mission automatically. |
+| `nav2_auto_send` | `true` | Allows Nav2 sender to forward selected waypoint goals. |
+| `use_hardcoded_trees` | `true` | Planner uses built-in tree positions instead of `/detected_trees`. |
+| `waypoint_mode` | `towards_centerline` | Waypoint generation mode. |
+| `waypoint_offset_x` | `0.0` | X offset used in fixed-offset waypoint mode. |
+| `waypoint_offset_y` | `-0.6` | Y offset used in fixed-offset waypoint mode. |
+| `centreline_y` | `0.0` | Orchard row centreline used by approach waypoint logic. |
+| `approach_distance` | `0.6` | Distance from tree to generated approach waypoint. |
+| `min_x`, `max_x`, `min_y`, `max_y` | `0.0`, `5.0`, `-2.5`, `2.5` | Rectangle used by fake boundary filter. |
+| `outside_value` | `0` | Occupancy value written outside the fake boundary. |
+| `spiral_min_radius` | `0.25` | Starting spiral radius around a tree. |
+| `spiral_max_radius` | `1.4` | Radius where spiral behaviour finishes. |
+| `spiral_loop_spacing` | `1.0` | Spiral loop spacing in robot-width units. |
+| `spiral_linear_speed` | `0.125` | Linear speed during spiral steering. |
+| `spiral_kp_heading` | `1.5` | Heading proportional gain for spiral steering. |
 
-### Run
+## Main Nodes
 
-Build and source the workspace:
+### `tree_waypoint_planner_node`
+
+Creates approach waypoints for each tree and selects the next unvisited waypoint.
+
+Publishes:
+
+- `/tree_markers`
+- `/tree_waypoint_markers`
+- `/tree_waypoints`
+- `/selected_tree_waypoint`
+- `/selected_tree_waypoint_marker`
+- `/tree_waypoint_status`
+
+Subscribes:
+
+- `/detected_trees`
+- `/mark_tree_visited`
+- `/reset_visited_trees`
+- `/tree_waypoint_start`
+- `/tree_waypoint_stop`
+
+### `nav2_waypoint_sender_node`
+
+Sends the selected tree waypoint to Nav2 using `/navigate_to_pose`.
+
+Publishes:
+
+- `/nav2_waypoint_status`
+- `/reached_tree_waypoint`
+
+Subscribes:
+
+- `/selected_tree_waypoint`
+- `/nav2_sender_start`
+- `/nav2_sender_stop`
+
+### `orchard_control_node`
+
+Runs the mission state machine:
+
+1. detect or collect trees
+2. plan a tree waypoint
+3. navigate to the selected tree
+4. start spiral tree behaviour
+5. mark the tree visited
+6. repeat until all trees are visited
+7. return home
+
+Publishes controller topics such as:
+
+- `/tree_memory_start`
+- `/tree_waypoint_start`
+- `/nav2_sender_start`
+- `/start_spiral`
+- `/stop_spiral`
+- `/mark_tree_visited`
+- `/orchard_controller/state`
+
+Start the mission manually with:
 
 ```bash
-colcon build --packages-select tree_waypoint_planner
-source install/setup.bash
+ros2 topic pub --once /orchard_controller/start std_msgs/msg/Empty "{}"
 ```
 
-Start the complete fake-detection test in separate terminals:
+### `spiral_controller`
 
-```bash
-# Terminal 1: publish fake detections on the raw /trees input
-ros2 run tree_waypoint_planner fake_tree_publisher_node --ros-args -r /detected_trees:=/trees
-```
+Runs a simple steering spiral around the selected tree. It is started by the orchard controller on `/start_spiral` and stopped on `/stop_spiral`.
 
-```bash
-# Terminal 2: remember, merge, and smooth the raw detections
-ros2 run tree_waypoint_planner tree_memory_node
-```
+Publishes:
 
-```bash
-# Terminal 3: consume the tracked tree output
-ros2 run tree_waypoint_planner tree_waypoint_planner_node --ros-args -p use_hardcoded_trees:=false
-```
+- `/cmd_vel`
+- `/spiral_markers`
 
-```bash
-# Terminal 4: visualise the pipeline
-rviz2
-```
+Subscribes:
 
-In RViz, set `Fixed Frame` to `odom` and add:
+- `/odometry/filtered`
+- `/start_spiral`
+- `/stop_spiral`
 
-* `MarkerArray` on `/tracked_tree_markers`
-* `MarkerArray` on `/tree_markers`
-* `MarkerArray` on `/tree_waypoint_markers`
-* `Marker` on `/selected_tree_waypoint_marker`
+### `tree_memory_node`
 
-Verify the tracked output from another terminal:
+Stores and smooths tree detections. It subscribes to raw tree poses on `/trees`, merges nearby detections, and republishes stable tree poses on `/detected_trees`.
 
-```bash
-ros2 topic echo /detected_trees
-```
+Publishes:
 
-## Visited Waypoint Tracking
+- `/detected_trees`
+- `/tracked_tree_markers`
+- `/tree_memory_status`
 
-In `nearest` selection mode, the planner selects the nearest unvisited waypoint by default. Visited waypoint arrows are grey in `/tree_waypoint_markers`, while unvisited arrows remain orange and the selected waypoint marker remains blue.
+### `fake_tree_publisher_node`
 
-`index` mode can still select visited waypoints and remains useful for testing a specific waypoint. Set `ignore_visited:=true` to restore the previous nearest-waypoint behaviour:
+Publishes hard-coded tree positions for testing.
 
-```bash
-ros2 run tree_waypoint_planner tree_waypoint_planner_node --ros-args -p ignore_visited:=true
-```
+Publishes:
 
-Run the planner:
+- `/detected_trees`
 
-```bash
-ros2 run tree_waypoint_planner tree_waypoint_planner_node
-```
+### `fake_boundary_filter_node`
 
-Mark waypoint index 0 visited:
+Filters an occupancy grid to a rectangular fake orchard area. It is useful for lab testing when objects outside the orchard area should be hidden from a separate detector.
 
-```bash
-ros2 topic pub --once /mark_tree_visited std_msgs/msg/Int32 "{data: 0}"
-```
+Subscribes:
 
-Reset all visited indices:
+- `/map`
 
-```bash
-ros2 topic pub --once /reset_visited_trees std_msgs/msg/Empty "{}"
-```
+Publishes:
 
-Echo planner status:
+- `/filtered_map`
+- `/orchard_boundary_marker`
+- `/boundary_filter_status`
 
-```bash
-ros2 topic echo /tree_waypoint_status
-```
+## Important Topics
 
-## Fake Orchard Boundary Filter Node
-
-`fake_boundary_filter_node` filters the full occupancy grid map to a rectangular fake orchard area. It exists so lab clutter outside the test orchard area, such as table legs, chairs, walls, or other random obstacles, can be hidden from Joshua's tree detection without changing the detector or waypoint planner.
-
-### Topics
-
-* Subscribes to `/map` (`nav_msgs/msg/OccupancyGrid`)
-  Full occupancy grid map.
-
-* Publishes `/filtered_map` (`nav_msgs/msg/OccupancyGrid`)
-  Copy of the latest map where cells outside the configured rectangle are replaced with `outside_value`.
-
-* Publishes `/orchard_boundary_marker` (`visualization_msgs/msg/Marker`)
-  Yellow `LINE_STRIP` rectangle showing the active fake orchard boundary in RViz.
-
-Joshua's tree detection should subscribe to `/filtered_map` instead of `/map` when running in the lab fake-orchard setup.
-
-### Parameters
-
-| Parameter | Default | Description |
+| Topic | Type | Purpose |
 | --- | --- | --- |
-| `input_map_topic` | `/map` | Occupancy grid topic to filter. |
-| `output_map_topic` | `/filtered_map` | Filtered occupancy grid output topic. |
-| `frame_id` | `map` | Marker frame used before a map has been received. |
-| `min_x` | `0.0` | Minimum rectangle x coordinate in map frame metres. |
-| `max_x` | `5.0` | Maximum rectangle x coordinate in map frame metres. |
-| `min_y` | `-2.0` | Minimum rectangle y coordinate in map frame metres. |
-| `max_y` | `2.0` | Maximum rectangle y coordinate in map frame metres. |
-| `outside_value` | `0` | Occupancy value written to cells outside the rectangle. |
-| `publish_rate_hz` | `1.0` | Rate for publishing the filtered map and boundary marker. |
-
-### Build
-
-```bash
-colcon build --packages-select tree_waypoint_planner
-source install/setup.bash
-```
-
-### Run
-
-```bash
-ros2 run tree_waypoint_planner fake_boundary_filter_node --ros-args \
-  -p min_x:=0.0 \
-  -p max_x:=5.0 \
-  -p min_y:=-2.0 \
-  -p max_y:=2.0 \
-  -p outside_value:=0
-```
-
-### Check Topics
-
-```bash
-ros2 topic echo /filtered_map --once
-ros2 topic list | grep map
-```
-
-### RViz
-
-Set `Fixed Frame` to `map` and add:
-
-* `Map` on `/map`
-* `Map` on `/filtered_map`
-* `Marker` on `/orchard_boundary_marker`
-
-
+| `/trees` | `geometry_msgs/msg/PoseArray` | Raw tree detections from an external detector. |
+| `/detected_trees` | `geometry_msgs/msg/PoseArray` | Tree list consumed by the waypoint planner. |
+| `/selected_tree_waypoint` | `geometry_msgs/msg/PoseStamped` | Current waypoint sent to Nav2. |
+| `/reached_tree_waypoint` | `std_msgs/msg/Bool` | Nav2 sender reports successful arrival. |
+| `/start_spiral` | `std_msgs/msg/Float32MultiArray` | Starts spiral around `[center_x, center_y, min_radius, max_radius, loop_spacing]`. |
+| `/stop_spiral` | `std_msgs/msg/Empty` | Stops spiral motion. |
+| `/cmd_vel` | `geometry_msgs/msg/TwistStamped` | Velocity command from spiral controller. |
