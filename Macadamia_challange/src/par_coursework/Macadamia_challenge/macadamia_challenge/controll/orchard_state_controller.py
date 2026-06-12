@@ -64,6 +64,7 @@ class OrchardControlNode(Node):
         self.reset_visited_pub = self.create_publisher(Empty, '/reset_visited_trees', 10)
         self.mark_tree_visited_pub = self.create_publisher(Int32, '/mark_tree_visited', 10)
         self.start_spiral_pub = self.create_publisher(Float32MultiArray, '/start_spiral', 10)
+        self.stop_spiral_pub = self.create_publisher(Empty, '/stop_spiral', 10)
 
         self.return_home_client = ActionClient(
             self,
@@ -182,6 +183,7 @@ class OrchardControlNode(Node):
         self.publish_empty(self.tree_memory_start_pub)
         self.publish_empty(self.tree_waypoint_start_pub)
         self.publish_empty(self.nav2_sender_stop_pub)
+        self.publish_empty(self.stop_spiral_pub)
         self.change_state(MissionState.DETECTING_TREES)
 
     def detect_trees(self):
@@ -200,6 +202,7 @@ class OrchardControlNode(Node):
     def plan_tree_waypoints(self):
         self.publish_empty(self.tree_waypoint_start_pub)
         self.publish_empty(self.nav2_sender_stop_pub)
+        self.publish_empty(self.stop_spiral_pub)
 
         if self.planner_reported_all_visited:
             self.change_state(MissionState.RETURNING_HOME)
@@ -225,6 +228,7 @@ class OrchardControlNode(Node):
     def navigate_to_current_tree(self):
         self.publish_empty(self.tree_waypoint_start_pub)
         self.publish_empty(self.nav2_sender_start_pub)
+        self.publish_empty(self.stop_spiral_pub)
 
         if self.tree_navigation_reached:
             self.publish_empty(self.nav2_sender_stop_pub)
@@ -248,11 +252,16 @@ class OrchardControlNode(Node):
             self.get_clock().now() - self.tree_behaviour_start_time
         ).nanoseconds / 1_000_000_000.0
         duration = float(self.get_parameter('tree_behaviour_duration_sec').value)
-        return elapsed >= duration
+        if elapsed < duration:
+            return False
+
+        self.publish_empty(self.stop_spiral_pub)
+        return True
 
     def return_home(self):
         self.publish_empty(self.tree_waypoint_stop_pub)
         self.publish_empty(self.nav2_sender_stop_pub)
+        self.publish_empty(self.stop_spiral_pub)
 
         if self.return_goal_done:
             if self.return_goal_succeeded:
@@ -390,6 +399,7 @@ class OrchardControlNode(Node):
     def fail(self, reason):
         self.get_logger().error(reason)
         self.publish_empty(self.nav2_sender_stop_pub)
+        self.publish_empty(self.stop_spiral_pub)
         self.change_state(MissionState.FAILED)
 
 

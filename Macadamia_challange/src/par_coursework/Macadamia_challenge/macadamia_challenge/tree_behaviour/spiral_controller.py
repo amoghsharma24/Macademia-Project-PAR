@@ -5,7 +5,7 @@ from rclpy.node import Node
 from geometry_msgs.msg import TwistStamped
 from nav_msgs.msg import Odometry
 from visualization_msgs.msg import Marker
-from std_msgs.msg import Float32MultiArray
+from std_msgs.msg import Empty, Float32MultiArray
 
 
 class SpiralController(Node):
@@ -47,6 +47,12 @@ class SpiralController(Node):
             Float32MultiArray,
             '/start_spiral',
             self.start_callback,
+            10
+        )
+        self.stop_sub = self.create_subscription(
+            Empty,
+            '/stop_spiral',
+            self.stop_callback,
             10
         )
 
@@ -99,7 +105,10 @@ class SpiralController(Node):
         self.publish_marker(1, target_x, target_y, 1.0, 0.0, 0.0, 'target_point')
 
         if not self.started:
-            self.stop_robot()
+            return
+
+        if self.current_x is None or self.current_y is None or self.current_yaw is None:
+            self.get_logger().warn('Waiting for odometry before running spiral', throttle_duration_sec=2.0)
             return
 
         dx = target_x - self.current_x
@@ -217,6 +226,16 @@ class SpiralController(Node):
             f'Start trigger received at robot pose: '
             f'x={self.current_x:.3f}, y={self.current_y:.3f}, yaw={self.current_yaw:.3f}'
         )
+
+    def stop_callback(self, _msg):
+        was_started = self.started
+
+        self.started = False
+        self.finished = False
+
+        if was_started:
+            self.get_logger().info('Spiral movement stopped')
+            self.stop_robot()
 
     def loop_spacing_metres(self):
         return self.loop_spacing * self.robot_width
