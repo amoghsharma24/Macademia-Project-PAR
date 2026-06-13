@@ -12,14 +12,14 @@ def generate_launch_description():
             DeclareLaunchArgument("frame_id", default_value="odom"),
             DeclareLaunchArgument("use_fake_trees", default_value="false"),
             DeclareLaunchArgument("use_tree_mapper", default_value="true"),
-            DeclareLaunchArgument("use_boundary_filter", default_value="false"),
-            DeclareLaunchArgument("use_memory", default_value="false"),
+            DeclareLaunchArgument("use_boundary_filter", default_value="true"),
+            DeclareLaunchArgument("use_memory", default_value="true"),
             DeclareLaunchArgument("use_nav2_sender", default_value="true"),
             DeclareLaunchArgument("use_orchard_controller", default_value="true"),
             DeclareLaunchArgument("use_spiral_controller", default_value="true"),
             DeclareLaunchArgument("start_active", default_value="true"),
             DeclareLaunchArgument("nav2_start_active", default_value="false"),
-            DeclareLaunchArgument("auto_start", default_value="false"),
+            DeclareLaunchArgument("auto_start", default_value="true"),
             DeclareLaunchArgument("nav2_auto_send", default_value="true"),
             DeclareLaunchArgument("use_hardcoded_trees", default_value="false"),
             DeclareLaunchArgument("waypoint_mode", default_value="towards_centerline"),
@@ -32,37 +32,43 @@ def generate_launch_description():
             DeclareLaunchArgument("min_y", default_value="-2.5"),
             DeclareLaunchArgument("max_y", default_value="2.5"),
             DeclareLaunchArgument("outside_value", default_value="0"),
-            DeclareLaunchArgument("tree_mapper_input_map_topic", default_value="/map"),
+            DeclareLaunchArgument("tree_mapper_input_map_topic", default_value="/filtered_map"),
             DeclareLaunchArgument(
-                "tree_mapper_output_topic", default_value="/detected_trees"
+                "tree_mapper_output_topic", default_value="/trees"
             ),
+            #Currently unused.
             DeclareLaunchArgument("tree_mapper_min_radius", default_value="0.05"),
+            #Currently unused.
             DeclareLaunchArgument("tree_mapper_max_radius", default_value="0.5"),
             DeclareLaunchArgument(
                 "radius_min",
-                default_value="-1.0",
+                default_value="0.02",
                 description="Minimum circle radius to detect (meters)",
             ),
             DeclareLaunchArgument(
                 "radius_max",
-                default_value="5.0",
+                default_value="0.12",
                 description="Maximum circle radius to detect (meters)",
             ),
+            # map is thresholded prior. Does nothing.
             DeclareLaunchArgument(
                 "threshold_free",
                 default_value="25",
                 description="Integer probability maximum for a occupancy grid square to be considered free (1-100)",
             ),
+            # map is thresholded prior. Does nothing.
             DeclareLaunchArgument(
                 "threshold_occupied",
                 default_value="65",
                 description="Integer probability minimum for a occupancy grid square to be considered occupied (1-100)",
             ),
+            # Unused
             DeclareLaunchArgument(
                 "bounds_height",
                 default_value="30.0",
                 description="the maximum distance infront of the starting location where detected trees will be considered. (meters)",
             ),
+            # Unused
             DeclareLaunchArgument(
                 "bounds_width",
                 default_value="15.0",
@@ -118,18 +124,14 @@ def generate_launch_description():
                 output="screen",
                 condition=IfCondition(LaunchConfiguration("use_tree_mapper")),
                 parameters=[
-                    # {
-                    #     "input_map_topic": LaunchConfiguration(
-                    #         "tree_mapper_input_map_topic"
-                    #     )
-                    # },
-                    # {
-                    #     "output_trees_topic": LaunchConfiguration(
-                    #         "tree_mapper_output_topic"
-                    #     )
-                    # },
                     # {"frame_id": LaunchConfiguration("frame_id")},
                     {
+                        "input_map_topic": LaunchConfiguration(
+                            "tree_mapper_input_map_topic"
+                        ),
+                        "output_trees_topic": LaunchConfiguration(
+                            "tree_mapper_output_topic"
+                        ),
                         "max_radius": LaunchConfiguration("radius_max"),
                         "min_radius": LaunchConfiguration("radius_min"),
                         "free_threshold": LaunchConfiguration("threshold_free"),
@@ -252,6 +254,23 @@ def generate_launch_description():
                     {"batch_size": LaunchConfiguration("spiral_nav2_batch_size")},
                 ],
             ),
-            # end region
+            
+            # Node(
+            #     package="macadamia_challenge",
+            #     executable="navigator_node",
+            #     name="navigator_node",
+            #     output="screen",
+            #     parameters=[
+            #     ],
+            # ),
+            # Node(
+            #     package="macadamia_challenge",
+            #     executable="planner_node",
+            #     name="planner_node",
+            #     output="screen",
+            #     parameters=[
+            #     ],
+            # ),
+            # endregion
         ]
     )
