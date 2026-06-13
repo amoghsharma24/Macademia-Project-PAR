@@ -24,6 +24,8 @@ class treeMapper(Node):
                 ("occupied_threshold", 1),
                 ("height_bounds", 1.0),
                 ("width_bounds", 1.0),
+                ("input_map_topic", "/default_topic"),
+                ("output_trees_topic", "/default_topic"),
             ],
         )
 
@@ -35,9 +37,13 @@ class treeMapper(Node):
         self.parameters = None
         self.started = False
 
+        # Other Parameters
+        input_map_topic = self.get_parameter("input_map_topic").value
+        output_trees_topic = self.get_parameter("output_trees_topic").value
+
         # Publishers
 
-        self.tree_publisher = self.create_publisher(PoseArray, "/trees", 10)
+        self.tree_publisher = self.create_publisher(PoseArray, output_trees_topic, 10)
 
         # self.single_tree_publisher = self.create_publisher(Pose, "/tree", 1)
 
@@ -47,7 +53,7 @@ class treeMapper(Node):
 
         # Subscriptions
 
-        self.create_subscription(OccupancyGrid, "/map", self.parse_occupancy_msg, 10)
+        self.create_subscription(OccupancyGrid, input_map_topic, self.parse_occupancy_msg, 10)
 
         self.create_subscription(
             Empty, "/tree_generator_start", self.run_generation, 10
@@ -74,25 +80,25 @@ class treeMapper(Node):
             return False
         return True
 
-    def check_bounds(self, x: float, y: float) -> bool:
+    # def check_bounds(self, x: float, y: float) -> bool:
 
-        width = self.parameters["width_bounds"]
-        height = self.parameters["height_bounds"]
-        #   2 * width
-        #      _______
-        #     |       |
-        #     |       |
-        #     |       |
-        #     |       | height
-        #     --[0,0]--
+    #     width = self.parameters["width_bounds"]
+    #     height = self.parameters["height_bounds"]
+    #     #   2 * width
+    #     #      _______
+    #     #     |       |
+    #     #     |       |
+    #     #     |       |
+    #     #     |       | height
+    #     #     --[0,0]--
 
-        if abs(x) > width:
-            return False
+    #     if abs(x) > width:
+    #         return False
 
-        if y > height or y < 0:
-            return False
+    #     if y > height or y < 0:
+    #         return False
 
-        return True
+    #     return True
 
     # endregion
 
@@ -155,8 +161,7 @@ class treeMapper(Node):
 
     def run_generation(self, msg: Empty) -> None:
         self.started = True
-        self.get_logger().info("tree generation request recieved.")
-        self.generate_from_topic()
+        self.get_logger().info("start trigger recieved.")
 
     def generate_from_topic(self) -> None:
 
@@ -170,12 +175,12 @@ class treeMapper(Node):
             or self.most_recent_time is None
             or self.parameters is None
         ):
-            self.get_logger().info(f"""starting information not recieved.
-            map: {self.most_recent_map is not None}
-            origin: {self.most_recent_origin is not None}
-            resolution: {self.most_recent_resolution is not None}
-            time: {self.most_recent_time is not None}
-            parameters: {self.parameters is not None}""")
+            self.get_logger().info(f"""map information not recieved.""")
+            # map: {self.most_recent_map is not None}
+            # origin: {self.most_recent_origin is not None}
+            # resolution: {self.most_recent_resolution is not None}
+            # time: {self.most_recent_time is not None}
+            # parameters: {self.parameters is not None}""")
             return
 
         self.get_logger().info("starting information & start trigger recieved.")
