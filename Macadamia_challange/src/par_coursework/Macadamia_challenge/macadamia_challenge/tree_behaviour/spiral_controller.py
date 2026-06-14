@@ -32,6 +32,7 @@ class SpiralController(Node):
 
         self.cmd_pub = self.create_publisher(TwistStamped, '/cmd_vel', 10)
         self.marker_pub = self.create_publisher(Marker, '/spiral_markers', 10)
+        self.done_pub = self.create_publisher(Empty, '/spiral_done', 10)
 
         self.odom_sub = self.create_subscription(
             Odometry,
@@ -91,11 +92,7 @@ class SpiralController(Node):
         radius = self.min_radius + self.k * self.theta
 
         if radius > self.max_radius:
-            if not self.finished:
-                self.finished = True
-                self.started = False
-                self.stop_robot()
-                self.get_logger().info('Finished spiral path')
+            self.finish_spiral()
             return
 
         target_x = self.center_x + radius * math.cos(self.theta)
@@ -150,6 +147,16 @@ class SpiralController(Node):
         cmd.header.stamp = self.get_clock().now().to_msg()
         cmd.header.frame_id = 'base_link'
         self.cmd_pub.publish(cmd)
+
+    def finish_spiral(self):
+        if self.finished:
+            return
+
+        self.finished = True
+        self.started = False
+        self.stop_robot()
+        self.done_pub.publish(Empty())
+        self.get_logger().info('Finished spiral path')
 
     def publish_marker(self, marker_id, x, y, r, g, b, name):
         marker = Marker()

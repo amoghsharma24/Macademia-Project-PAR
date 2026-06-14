@@ -36,7 +36,6 @@ class OrchardControlNode(Node):
         self.declare_parameter('home_yaw', 0.0)
         self.declare_parameter('nav2_action_name', '/navigate_to_pose')
         self.declare_parameter('nav2_timeout_sec', 5.0)
-        self.declare_parameter('tree_behaviour_duration_sec', 8.0)
         self.declare_parameter('spiral_min_radius', 0.25)
         self.declare_parameter('spiral_max_radius', 1.4)
         self.declare_parameter('spiral_loop_spacing', 1.0)
@@ -50,7 +49,7 @@ class OrchardControlNode(Node):
         self.planner_reported_all_visited = False
         self.tree_navigation_reached = False
         self.tree_behaviour_started = False
-        self.tree_behaviour_start_time = None
+        self.tree_behaviour_done = False
         self.return_goal_active = False
         self.return_goal_done = False
         self.return_goal_succeeded = False
@@ -93,6 +92,7 @@ class OrchardControlNode(Node):
             self.reached_tree_waypoint_callback,
             10,
         )
+        self.create_subscription(Empty, '/spiral_done', self.spiral_done_callback, 10)
 
         period = float(self.get_parameter('state_period_sec').value)
         self.create_timer(period, self.control_loop)
@@ -127,6 +127,10 @@ class OrchardControlNode(Node):
     def reached_tree_waypoint_callback(self, msg):
         if msg.data and self.state == MissionState.NAVIGATING_TO_TREE:
             self.tree_navigation_reached = True
+
+    def spiral_done_callback(self, _msg):
+        if self.state == MissionState.RUNNING_TREE_BEHAVIOUR:
+            self.tree_behaviour_done = True
 
     def control_loop(self):
         self.publish_state()
@@ -176,6 +180,7 @@ class OrchardControlNode(Node):
         self.planner_reported_all_visited = False
         self.tree_navigation_reached = False
         self.tree_behaviour_started = False
+        self.tree_behaviour_done = False
         self.return_goal_active = False
         self.return_goal_done = False
         self.return_goal_succeeded = False
@@ -251,11 +256,11 @@ class OrchardControlNode(Node):
             self.start_tree_behaviour()
             return False
 
-        elapsed = (
-            self.get_clock().now() - self.tree_behaviour_start_time
-        ).nanoseconds / 1_000_000_000.0
-        duration = float(self.get_parameter('tree_behaviour_duration_sec').value)
-        if elapsed < duration:
+        if not self.tree_behaviour_done:
+            self.get_logger().info(
+                'Waiting for spiral behaviour to finish on /spiral_done',
+                throttle_duration_sec=2.0,
+            )
             return False
 
         self.publish_empty(self.stop_spiral_pub)
@@ -296,7 +301,7 @@ class OrchardControlNode(Node):
         ]
         self.start_spiral_pub.publish(msg)
         self.tree_behaviour_started = True
-        self.tree_behaviour_start_time = self.get_clock().now()
+        self.tree_behaviour_done = False
         self.get_logger().info(f'Started tree behaviour for tree {self.selected_tree_index}')
 
     def current_tree_pose(self):
@@ -384,7 +389,7 @@ class OrchardControlNode(Node):
             self.tree_navigation_reached = False
         elif new_state == MissionState.RUNNING_TREE_BEHAVIOUR:
             self.tree_behaviour_started = False
-            self.tree_behaviour_start_time = None
+            self.tree_behaviour_done = False
         elif new_state == MissionState.COMPLETE:
             self.mission_active = False
 
