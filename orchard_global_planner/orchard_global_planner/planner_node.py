@@ -122,7 +122,7 @@ class PlannerNode(Node):
 #            f"odom={self.current_x is not None} "
 #            f"goal={self.goal_x is not None}"
 #        )
-        if not self.plane_requested:
+        if not self.plan_requested:
             return
 
         if self.map_data is None:
