@@ -201,6 +201,8 @@ Publishes controller topics such as:
 - `/mark_tree_visited`
 - `/orchard_controller/state`
 
+It subscribes to `/spiral_done` and moves to the next tree only after the spiral controller reports that it has reached its configured maximum radius.
+
 Start the mission manually with:
 
 ```bash
@@ -215,6 +217,7 @@ Publishes:
 
 - `/cmd_vel`
 - `/spiral_markers`
+- `/spiral_done`
 
 Subscribes:
 
@@ -229,6 +232,7 @@ Runs the spiral by sending batches of poses to Nav2 `NavigateThroughPoses`. Enab
 Publishes:
 
 - `/spiral_markers`
+- `/spiral_done`
 
 Subscribes:
 
@@ -291,5 +295,6 @@ Publishes:
 | `/reached_tree_waypoint` | `std_msgs/msg/Bool` | Nav2 sender reports successful arrival. |
 | `/start_spiral` | `std_msgs/msg/Float32MultiArray` | Starts spiral around `[center_x, center_y, min_radius, max_radius, loop_spacing]`. |
 | `/stop_spiral` | `std_msgs/msg/Empty` | Stops spiral motion. |
+| `/spiral_done` | `std_msgs/msg/Empty` | Spiral controller reports that tree behaviour has finished. |
 | `/cmd_vel` | `geometry_msgs/msg/TwistStamped` | Velocity command from spiral controller. |
 

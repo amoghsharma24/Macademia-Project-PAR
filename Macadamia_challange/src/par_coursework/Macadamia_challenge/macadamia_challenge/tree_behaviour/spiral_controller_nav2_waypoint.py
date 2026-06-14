@@ -61,6 +61,7 @@ class SpiralController(Node):
 
         self.cmd_pub = self.create_publisher(TwistStamped, '/cmd_vel', 10)
         self.marker_pub = self.create_publisher(Marker, '/spiral_markers', 10)
+        self.done_pub = self.create_publisher(Empty, '/spiral_done', 10)
 
         self.odom_sub = self.create_subscription(
             Odometry,
@@ -286,6 +287,7 @@ class SpiralController(Node):
         self.started = False
         self.cancel_active_goal()
         self.stop_robot()
+        self.done_pub.publish(Empty())
         self.get_logger().info('Finished spiral path')
 
     def cancel_active_goal(self):
