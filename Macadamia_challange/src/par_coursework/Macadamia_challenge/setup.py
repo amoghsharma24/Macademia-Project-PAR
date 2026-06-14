@@ -33,6 +33,7 @@ setup(
             'spiral_controller = macadamia_challenge.tree_behaviour.spiral_controller:main',
             'spiral_nav2_controller = macadamia_challenge.tree_behaviour.spiral_controller_nav2_waypoint:main',
             'tree_mapper_node = macadamia_challenge.tree_detection.tree_mapper_node:main',
+            'navigator_node = macadamia_challenge.path_navigator.navigator_node:main',
         ],
     },
 )
