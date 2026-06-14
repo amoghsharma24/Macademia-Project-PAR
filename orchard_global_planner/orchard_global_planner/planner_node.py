@@ -26,6 +26,9 @@ class PlannerNode(Node):
             10
         )
 
+        self.declare_parameter('planner_type', 'RRTstar')
+        self.planner_type = self.get_parameter('planner_type').value
+
         self.robot_radius = 0.16 # metres, according to the internet
         self.safety_margin = 0.04 # just as a buffer
 
@@ -67,6 +70,37 @@ class PlannerNode(Node):
             10
         )
 
+    def create_planner(self, planner_type, space_information):
+
+        planners = {
+            'AORRTC': og.AORRTC, 
+            'BFMT': og.BFMT, 
+            'BITstar': og.BITstar, 
+            'BKPIECE1': og.BKPIECE1, 
+            'FMT': og.FMT, 
+            'InformedRRTstar': og.InformedRRTstar, 
+            'KPIECE1': og.KPIECE1, 
+            'LBKPIECE1': og.LBKPIECE1, 
+            'PRM': og.PRM,
+            'PRMstar': og.PRMstar, 
+            'RRT': og.RRT, 
+            'RRTConnect': og.RRTConnect, 
+            'RRTstar': og.RRTstar, 
+            'SORRTstar': og.SORRTstar,        
+        }
+
+        if planner_type not in planners: 
+            self.get_logger().warn(
+                f"Unknown planner_type '{planner_type}', defaulting to RRTstar"
+            )
+            planner_type = 'RRTstar'
+
+        self.get_logger().info(
+            f"Using OMPL planner: {planner_type}"
+        )
+
+        return planners[planner_type](space_information)
+
     def quaternion_to_yaw(self, q):
 
         siny_cosp = 2.0 * (
@@ -91,6 +125,8 @@ class PlannerNode(Node):
 #            f"odom={self.current_x is not None} "
 #            f"goal={self.goal_x is not None}"
 #        )
+        if not self.plan_requested:
+            return
 
         if self.map_data is None:
             return
@@ -251,7 +287,8 @@ class PlannerNode(Node):
 
         ss.setStartAndGoalStates(start, goal)
 
-        planner = og.RRTstar(
+        planner = self.create_planner(
+            self.planner_type,
             ss.getSpaceInformation()
         )
 
