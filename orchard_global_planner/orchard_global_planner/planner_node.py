@@ -99,7 +99,7 @@ class PlannerNode(Node):
             f"Using OMPL planner: {planner_type}"
         )
 
-        return planners[planner_type][space_information]
+        return planners[planner_type](space_information)
 
     def quaternion_to_yaw(self, q):
 
