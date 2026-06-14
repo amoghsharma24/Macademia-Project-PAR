@@ -73,17 +73,20 @@ class PlannerNode(Node):
     def create_planner(self, planner_type, space_information):
 
         planners = {
-            'RRTConnect' : og.RRTConnect,
-            'RRTstar': og.RRTstar,
-            'RRT': og.RRT,
+            'AORRTC': og.AORRTC, 
+            'BFMT': og.BFMT, 
+            'BITstar': og.BITstar, 
+            'BKPIECE1': og.BKPIECE1, 
+            'FMT': og.FMT, 
+            'InformedRRTstar': og.InformedRRTstar, 
+            'KPIECE1': og.KPIECE1, 
+            'LBKPIECE1': og.LBKPIECE1, 
             'PRM': og.PRM,
-            'PRMstar': og.PRMstar,
-            'EST': og.EST,
-            'KPIECE1': og.KPIECE1,
-            'BKPIECE1': og.BKPIECE1,
-            'LBKPIECE1': og.LBKPIECE1,
-            'SBL': og.SBL,
-            'STRIDE': og.STRIDE,            
+            'PRMstar': og.PRMstar, 
+            'RRT': og.RRT, 
+            'RRTConnect': og.RRTConnect, 
+            'RRTstar': og.RRTstar, 
+            'SORRTstar': og.SORRTstar,        
         }
 
         if planner_type not in planners: 
