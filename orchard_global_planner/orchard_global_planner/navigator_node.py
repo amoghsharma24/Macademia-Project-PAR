@@ -4,6 +4,8 @@ from rclpy.action import ActionClient
 
 from nav_msgs.msg import Path
 from nav2_msgs.action import NavigateThroughPoses
+from std_msgs.msg import String, Bool, Empty
+from action_msgs.msg import GoalStatus
 
 
 class NavigatorNode(Node):
@@ -23,6 +25,10 @@ class NavigatorNode(Node):
             self.path_callback,
             10
         )
+
+        self.status_pub = self.create_publisher(String, '/navigator_status', 10)
+        self.reached_pub = self.create_publisher(Bool, '/reached_tree_waypoint', 10)
+
 
         self.goal_sent = False
     
@@ -74,10 +80,27 @@ class NavigatorNode(Node):
         status = future.result().status
 
         self.get_logger().info(
-            f"Nav2 finished ith status: {status}"
+            f"Nav2 finished with status: {status}"
         )
+        
+        if result.status == GoalStatus.STATUS_SUCCEEDED:
+            self.publish_status('goal succeeded')
+            reached = Bool()
+            reached.data = True
+            self.reached_pub.publish(reached)
+            return
+        else:
+            self.publish_status('goal failed')
 
         self.goal_sent = False
+
+    def publish_status(self, text):
+        if not self.active and text != 'stopped':
+            return
+
+        msg = String()
+        msg.data = text
+        self.status_pub.publish(msg)
 
 def main(args=None):
 
