@@ -75,13 +75,16 @@ def generate_launch_description():
                 description="the maximum distance at either side of the starting location where detected trees will be considered.",
             ),
             # endregion
+
             # region nodes
             DeclareLaunchArgument("spiral_min_radius", default_value="0.25"),
-            DeclareLaunchArgument("spiral_max_radius", default_value="1.4"),
+            DeclareLaunchArgument("spiral_max_radius", default_value="0.5"),
             DeclareLaunchArgument("spiral_loop_spacing", default_value="1.0"),
             DeclareLaunchArgument("spiral_mode", default_value="steering"),
             DeclareLaunchArgument("spiral_linear_speed", default_value="0.125"),
             DeclareLaunchArgument("spiral_kp_heading", default_value="1.5"),
+
+
             DeclareLaunchArgument(
                 "spiral_nav2_action_name", default_value="navigate_through_poses"
             ),

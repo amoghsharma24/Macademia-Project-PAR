@@ -7,6 +7,8 @@ from nav_msgs.msg import Odometry
 from geometry_msgs.msg import PoseStamped
 from visualization_msgs.msg import Marker
 from geometry_msgs.msg import Point
+from std_msgs.msg import String
+from std_msgs.msg import Float64
 
 
 from math import atan2
@@ -61,6 +63,27 @@ class PlannerNode(Node):
             PoseStamped, 
             '/next_pose',
             self.goal_callback,
+            10
+        )
+
+        self.planner_select_sub = self.create_subscription(
+            String,
+            '/select_planner',
+            self.planner_select_callback,
+            10
+        )
+
+        self.robot_radius_sub = self.create_subscription(
+            Float64,
+            '/set_robot_radius',
+            self.robot_radius_callback,
+            10
+        )
+
+        self.safety_margin_callback = self.create_subscription(
+            Float64,
+            '/set_safety_margin',
+            self.safety_margin_callback,
             10
         )
 
@@ -172,6 +195,50 @@ class PlannerNode(Node):
         self.plan_requested = True  
 
         self.try_plan()
+    
+    def planner_select_callback(self, msg):
+
+        planner = msg.data.strip()
+
+        valid = {
+            'AORRTC',
+            'BFMT',
+            'BITstar',
+            'BKPIECE1',
+            'FMT',
+            'InformedRRTstar',
+            'KPIECE1',
+            'LBKPIECE1',
+            'PRM',
+            'PRMstar',
+            'RRT',
+            'RRTConnect',
+            'RRTstar',
+            'SORRTstar',
+        }    
+
+        if planner not in valid: 
+
+            self.get_logger().warn(
+                f"Unknown planner '{planner}'"
+            )
+
+            return
+
+        self.planner_type = planner
+        
+        self.get_logger().info(
+            f"Planner changed to: {planner}"
+        )
+    
+    def robot_radius_callback(self, msg):
+        
+        self.robot_radius = msg.data.strip()
+
+    def safety_margin_callback(self, msg):
+
+        self.safety_margin = msg.data.strip()
+
 
     def is_state_valid(self, state):
 
