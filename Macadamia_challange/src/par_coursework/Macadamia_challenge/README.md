@@ -132,6 +132,7 @@ ros2 launch macadamia_challenge macadamia_challange.launch.py \
 | `spiral_min_radius` | `0.25` | Starting spiral radius around a tree. |
 | `spiral_max_radius` | `1.4` | Radius where spiral behaviour finishes. |
 | `spiral_loop_spacing` | `1.0` | Spiral loop spacing in robot-width units. |
+| `spiral_shape` | `round` | Spiral shape: `round` for circular spiral, `square` for squared-off spiral. |
 | `spiral_mode` | `steering` | Spiral implementation: `steering` for direct `/cmd_vel`, or `nav2` for Nav2 waypoint batches. |
 | `spiral_linear_speed` | `0.125` | Linear speed during spiral steering. |
 | `spiral_kp_heading` | `1.5` | Heading proportional gain for spiral steering. |

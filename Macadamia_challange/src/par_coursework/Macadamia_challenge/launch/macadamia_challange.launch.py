@@ -91,6 +91,7 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument("spiral_nav2_waypoint_spacing", default_value="0.35"),
             DeclareLaunchArgument("spiral_nav2_batch_size", default_value="8"),
+            DeclareLaunchArgument("spiral_shape", default_value="round"),
             Node(
                 package="macadamia_challenge",
                 executable="fake_tree_publisher_node",
@@ -206,7 +207,38 @@ def generate_launch_description():
                             "' == 'true' and ",
                             "'",
                             LaunchConfiguration("spiral_mode"),
-                            "' == 'steering'",
+                            "' == 'steering' and ",
+                            "'",
+                            LaunchConfiguration("spiral_shape"),
+                            "' == 'round'",
+                        ]
+                    )
+                ),
+                parameters=[
+                    {"min_radius": LaunchConfiguration("spiral_min_radius")},
+                    {"max_radius": LaunchConfiguration("spiral_max_radius")},
+                    {"loop_spacing": LaunchConfiguration("spiral_loop_spacing")},
+                    {"linear_speed": LaunchConfiguration("spiral_linear_speed")},
+                    {"kp_heading": LaunchConfiguration("spiral_kp_heading")},
+                ],
+            ),
+            Node(
+                package="macadamia_challenge",
+                executable="spiral_controller_square",
+                name="spiral_steering_controller_square",
+                output="screen",
+                condition=IfCondition(
+                    PythonExpression(
+                        [
+                            "'",
+                            LaunchConfiguration("use_spiral_controller"),
+                            "' == 'true' and ",
+                            "'",
+                            LaunchConfiguration("spiral_mode"),
+                            "' == 'steering' and ",
+                            "'",
+                            LaunchConfiguration("spiral_shape"),
+                            "' == 'square'",
                         ]
                     )
                 ),
@@ -231,7 +263,49 @@ def generate_launch_description():
                             "' == 'true' and ",
                             "'",
                             LaunchConfiguration("spiral_mode"),
-                            "' == 'nav2'",
+                            "' == 'nav2' and ",
+                            "'",
+                            LaunchConfiguration("spiral_shape"),
+                            "' == 'round'",
+                        ]
+                    )
+                ),
+                parameters=[
+                    {"min_radius": LaunchConfiguration("spiral_min_radius")},
+                    {"max_radius": LaunchConfiguration("spiral_max_radius")},
+                    {"loop_spacing": LaunchConfiguration("spiral_loop_spacing")},
+                    {
+                        "nav2_action_name": LaunchConfiguration(
+                            "spiral_nav2_action_name"
+                        )
+                    },
+                    {"goal_frame": LaunchConfiguration("spiral_nav2_goal_frame")},
+                    {"odom_topic": LaunchConfiguration("spiral_nav2_odom_topic")},
+                    {
+                        "waypoint_spacing": LaunchConfiguration(
+                            "spiral_nav2_waypoint_spacing"
+                        )
+                    },
+                    {"batch_size": LaunchConfiguration("spiral_nav2_batch_size")},
+                ],
+            ),
+            Node(
+                package="macadamia_challenge",
+                executable="spiral_nav2_controller_square",
+                name="spiral_nav2_controller_square",
+                output="screen",
+                condition=IfCondition(
+                    PythonExpression(
+                        [
+                            "'",
+                            LaunchConfiguration("use_spiral_controller"),
+                            "' == 'true' and ",
+                            "'",
+                            LaunchConfiguration("spiral_mode"),
+                            "' == 'nav2' and ",
+                            "'",
+                            LaunchConfiguration("spiral_shape"),
+                            "' == 'square'",
                         ]
                     )
                 ),
