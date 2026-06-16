@@ -25,8 +25,6 @@ class MissionState(Enum):
 
 
 class OrchardControlNode(Node):
-    DIRECT_NEIGHBOUR_AXIS_TOLERANCE = 0.5
-
     def __init__(self):
         super().__init__('orchard_control_node')
 
@@ -342,14 +340,7 @@ class OrchardControlNode(Node):
         return max_radius
 
     def tree_neighbour_distances(self, tree_position):
-        axis_tolerance = self.DIRECT_NEIGHBOUR_AXIS_TOLERANCE
-        direct_neighbours = {
-            'above': None,
-            'below': None,
-            'left': None,
-            'right': None,
-        }
-
+        distances = []
         for index, pose in enumerate(self.detected_trees):
             if index == self.selected_tree_index:
                 continue
@@ -357,31 +348,10 @@ class OrchardControlNode(Node):
             dx = pose.position.x - tree_position.x
             dy = pose.position.y - tree_position.y
             distance = math.sqrt(dx ** 2 + dy ** 2)
-            if distance <= 0.0:
-                continue
+            if distance > 0.0:
+                distances.append(distance)
 
-            if abs(dx) <= axis_tolerance:
-                if dy > 0.0:
-                    self.set_closest_neighbour(direct_neighbours, 'above', distance)
-                elif dy < 0.0:
-                    self.set_closest_neighbour(direct_neighbours, 'below', distance)
-
-            if abs(dy) <= axis_tolerance:
-                if dx > 0.0:
-                    self.set_closest_neighbour(direct_neighbours, 'right', distance)
-                elif dx < 0.0:
-                    self.set_closest_neighbour(direct_neighbours, 'left', distance)
-
-        return [
-            distance
-            for distance in direct_neighbours.values()
-            if distance is not None
-        ]
-
-    def set_closest_neighbour(self, direct_neighbours, direction, distance):
-        current_distance = direct_neighbours[direction]
-        if current_distance is None or distance < current_distance:
-            direct_neighbours[direction] = distance
+        return sorted(distances)[:2]
 
     def current_tree_pose(self):
         if self.selected_tree_index is None:

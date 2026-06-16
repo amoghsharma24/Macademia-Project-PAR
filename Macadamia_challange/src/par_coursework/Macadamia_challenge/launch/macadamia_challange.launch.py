@@ -78,7 +78,7 @@ def generate_launch_description():
 
             # region nodes
             DeclareLaunchArgument("spiral_min_radius", default_value="0.25"),
-            DeclareLaunchArgument("spiral_max_radius", default_value="0.5"),
+            DeclareLaunchArgument("spiral_max_radius", default_value="0.0"),
             DeclareLaunchArgument("spiral_loop_spacing", default_value="1.0"),
             DeclareLaunchArgument("spiral_mode", default_value="steering"),
             DeclareLaunchArgument("spiral_linear_speed", default_value="0.125"),
