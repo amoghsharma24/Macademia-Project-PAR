@@ -210,7 +210,6 @@ class OrchardControlNode(Node):
     def plan_tree_waypoints(self):
         self.publish_empty(self.tree_waypoint_start_pub)
         self.publish_empty(self.nav2_sender_stop_pub)
-        self.publish_empty(self.stop_spiral_pub)
 
         if self.planner_reported_all_visited:
             self.change_state(MissionState.RETURNING_HOME)
@@ -236,7 +235,6 @@ class OrchardControlNode(Node):
     def navigate_to_current_tree(self):
         self.publish_empty(self.tree_waypoint_start_pub)
         self.publish_empty(self.nav2_sender_start_pub)
-        self.publish_empty(self.stop_spiral_pub)
 
         if self.tree_navigation_reached:
             self.publish_empty(self.nav2_sender_stop_pub)

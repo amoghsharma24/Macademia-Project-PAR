@@ -88,6 +88,8 @@ class SpiralController(Node):
         self.current_yaw = self.quaternion_to_yaw(q)
 
     def control_loop(self):
+        if not self.started:
+            return
 
         radius = self.min_radius + self.k * self.theta
 
@@ -100,9 +102,6 @@ class SpiralController(Node):
 
         self.publish_marker(0, self.center_x, self.center_y, 0.0, 1.0, 0.0, 'centre_point')
         self.publish_marker(1, target_x, target_y, 1.0, 0.0, 0.0, 'target_point')
-
-        if not self.started:
-            return
 
         if self.current_x is None or self.current_y is None or self.current_yaw is None:
             self.get_logger().warn('Waiting for odometry before running spiral', throttle_duration_sec=2.0)
