@@ -30,7 +30,7 @@ class OrchardControlNode(Node):
 
         self.declare_parameter('auto_start', False)
         self.declare_parameter('state_period_sec', 0.5)
-        self.declare_parameter('frame_id', 'odom')
+        self.declare_parameter('frame_id', 'map')
         self.declare_parameter('home_x', 0.0)
         self.declare_parameter('home_y', 0.0)
         self.declare_parameter('home_yaw', 0.0)

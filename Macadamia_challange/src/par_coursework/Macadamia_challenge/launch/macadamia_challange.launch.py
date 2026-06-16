@@ -8,8 +8,11 @@ from launch_ros.actions import Node
 def generate_launch_description():
     return LaunchDescription(
         [
-            # region launch arguments
-            DeclareLaunchArgument("frame_id", default_value="odom"),
+            # shared launch arguments
+            DeclareLaunchArgument("frame_id", default_value="map"),
+            DeclareLaunchArgument("start_active", default_value="true"),
+
+            # control loop node toggles
             DeclareLaunchArgument("use_fake_trees", default_value="false"),
             DeclareLaunchArgument("use_tree_mapper", default_value="true"),
             DeclareLaunchArgument("use_boundary_filter", default_value="true"),
@@ -17,28 +20,22 @@ def generate_launch_description():
             DeclareLaunchArgument("use_nav2_sender", default_value="true"),
             DeclareLaunchArgument("use_orchard_controller", default_value="true"),
             DeclareLaunchArgument("use_spiral_controller", default_value="true"),
-            DeclareLaunchArgument("start_active", default_value="true"),
-            DeclareLaunchArgument("nav2_start_active", default_value="false"),
-            DeclareLaunchArgument("auto_start", default_value="true"),
-            DeclareLaunchArgument("nav2_auto_send", default_value="true"),
-            DeclareLaunchArgument("use_hardcoded_trees", default_value="false"),
-            DeclareLaunchArgument("waypoint_mode", default_value="towards_centerline"),
-            DeclareLaunchArgument("waypoint_offset_x", default_value="0.0"),
-            DeclareLaunchArgument("waypoint_offset_y", default_value="-0.6"),
-            DeclareLaunchArgument("centreline_y", default_value="0.0"),
-            DeclareLaunchArgument("approach_distance", default_value="0.6"),
+
+            # fake_boundary_filter_node arguments
             DeclareLaunchArgument("min_x", default_value="0.0"),
             DeclareLaunchArgument("max_x", default_value="5.0"),
             DeclareLaunchArgument("min_y", default_value="-2.5"),
             DeclareLaunchArgument("max_y", default_value="2.5"),
             DeclareLaunchArgument("outside_value", default_value="0"),
+
+            # tree_mapper_node arguments
             DeclareLaunchArgument("tree_mapper_input_map_topic", default_value="/filtered_map"),
             DeclareLaunchArgument(
                 "tree_mapper_output_topic", default_value="/trees"
             ),
-            #Currently unused.
+            # Currently unused.
             DeclareLaunchArgument("tree_mapper_min_radius", default_value="0.05"),
-            #Currently unused.
+            # Currently unused.
             DeclareLaunchArgument("tree_mapper_max_radius", default_value="0.5"),
             DeclareLaunchArgument(
                 "radius_min",
@@ -50,13 +47,13 @@ def generate_launch_description():
                 default_value="0.12",
                 description="Maximum circle radius to detect (meters)",
             ),
-            # map is thresholded prior. Does nothing.
+            # Map is thresholded prior. Does nothing.
             DeclareLaunchArgument(
                 "threshold_free",
                 default_value="25",
                 description="Integer probability maximum for a occupancy grid square to be considered free (1-100)",
             ),
-            # map is thresholded prior. Does nothing.
+            # Map is thresholded prior. Does nothing.
             DeclareLaunchArgument(
                 "threshold_occupied",
                 default_value="65",
@@ -74,17 +71,30 @@ def generate_launch_description():
                 default_value="15.0",
                 description="the maximum distance at either side of the starting location where detected trees will be considered.",
             ),
-            # endregion
 
-            # region nodes
+            # tree_waypoint_planner_node arguments
+            DeclareLaunchArgument("use_hardcoded_trees", default_value="false"),
+            DeclareLaunchArgument("waypoint_mode", default_value="towards_centerline"),
+            DeclareLaunchArgument("waypoint_offset_x", default_value="0.0"),
+            DeclareLaunchArgument("waypoint_offset_y", default_value="-0.6"),
+            DeclareLaunchArgument("centreline_y", default_value="0.0"),
+            DeclareLaunchArgument("approach_distance", default_value="0.6"),
+
+            # nav2_waypoint_sender_node arguments
+            DeclareLaunchArgument("nav2_start_active", default_value="false"),
+            DeclareLaunchArgument("nav2_auto_send", default_value="true"),
+
+            # orchard_control_node arguments
+            DeclareLaunchArgument("auto_start", default_value="true"),
+
+            # spiral tree-behaviour arguments
             DeclareLaunchArgument("spiral_min_radius", default_value="0.25"),
             DeclareLaunchArgument("spiral_max_radius", default_value="0.0"),
             DeclareLaunchArgument("spiral_loop_spacing", default_value="1.0"),
+            DeclareLaunchArgument("spiral_shape", default_value="round"),
             DeclareLaunchArgument("spiral_mode", default_value="steering"),
             DeclareLaunchArgument("spiral_linear_speed", default_value="0.125"),
             DeclareLaunchArgument("spiral_kp_heading", default_value="1.5"),
-
-
             DeclareLaunchArgument(
                 "spiral_nav2_action_name", default_value="navigate_through_poses"
             ),
@@ -94,7 +104,8 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument("spiral_nav2_waypoint_spacing", default_value="0.35"),
             DeclareLaunchArgument("spiral_nav2_batch_size", default_value="8"),
-            DeclareLaunchArgument("spiral_shape", default_value="round"),
+
+            # detection nodes
             Node(
                 package="macadamia_challenge",
                 executable="fake_tree_publisher_node",
@@ -145,6 +156,8 @@ def generate_launch_description():
                     },
                 ],
             ),
+
+            # memory and waypoint nodes
             Node(
                 package="macadamia_challenge",
                 executable="tree_memory_node",
@@ -183,6 +196,8 @@ def generate_launch_description():
                     {"start_active": LaunchConfiguration("nav2_start_active")},
                 ],
             ),
+
+            # control loop node
             Node(
                 package="macadamia_challenge",
                 executable="orchard_control_node",
@@ -197,6 +212,8 @@ def generate_launch_description():
                     {"spiral_loop_spacing": LaunchConfiguration("spiral_loop_spacing")},
                 ],
             ),
+
+            # spiral tree-behaviour nodes
             Node(
                 package="macadamia_challenge",
                 executable="spiral_controller",
@@ -221,6 +238,7 @@ def generate_launch_description():
                     {"min_radius": LaunchConfiguration("spiral_min_radius")},
                     {"max_radius": LaunchConfiguration("spiral_max_radius")},
                     {"loop_spacing": LaunchConfiguration("spiral_loop_spacing")},
+                    {"goal_frame": LaunchConfiguration("frame_id")},
                     {"linear_speed": LaunchConfiguration("spiral_linear_speed")},
                     {"kp_heading": LaunchConfiguration("spiral_kp_heading")},
                 ],
@@ -249,6 +267,7 @@ def generate_launch_description():
                     {"min_radius": LaunchConfiguration("spiral_min_radius")},
                     {"max_radius": LaunchConfiguration("spiral_max_radius")},
                     {"loop_spacing": LaunchConfiguration("spiral_loop_spacing")},
+                    {"goal_frame": LaunchConfiguration("frame_id")},
                     {"linear_speed": LaunchConfiguration("spiral_linear_speed")},
                     {"kp_heading": LaunchConfiguration("spiral_kp_heading")},
                 ],
@@ -331,7 +350,8 @@ def generate_launch_description():
                     {"batch_size": LaunchConfiguration("spiral_nav2_batch_size")},
                 ],
             ),
-            
+
+            # disabled/example nodes
             # Node(
             #     package="macadamia_challenge",
             #     executable="navigator_node",
