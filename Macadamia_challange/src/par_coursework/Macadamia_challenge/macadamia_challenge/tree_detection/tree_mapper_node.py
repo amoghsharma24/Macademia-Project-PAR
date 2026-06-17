@@ -34,6 +34,7 @@ class treeMapper(Node):
         self.most_recent_map = None
         self.most_recent_resolution = None
         self.most_recent_time = None
+        self.most_recent_frame_id = "map"
         self.parameters = None
         self.started = False
 
@@ -173,6 +174,7 @@ class treeMapper(Node):
             or self.most_recent_origin is None
             or self.most_recent_resolution is None
             or self.most_recent_time is None
+            or self.most_recent_frame_id is None
             or self.parameters is None
         ):
             self.get_logger().info(f"""map information not recieved.""")
@@ -220,7 +222,7 @@ class treeMapper(Node):
         self.get_logger().info(f"trees detected: {len(trees)}")
 
         self.get_logger().info("2/3 trees transformed")
-        self.publish_circles(trees, self.most_recent_time)
+        self.publish_circles(trees, self.most_recent_time, self.most_recent_frame_id)
         self.get_logger().info("3/3 trees published")
 
     # endregion
@@ -239,6 +241,7 @@ class treeMapper(Node):
         self.most_recent_map = self.transform_grid_to_image(msg)
         self.most_recent_resolution = msg.info.resolution
         self.most_recent_time = msg.info.map_load_time
+        self.most_recent_frame_id = msg.header.frame_id or "map"
 
         # self.get_logger().info("info processed")
 
@@ -263,10 +266,11 @@ class treeMapper(Node):
         self,
         circles: List[Tuple[float, float]],
         time: Time,
+        frame_id: str,
     ) -> None:
         trees = PoseArray()
 
-        trees.header.frame_id = "map"
+        trees.header.frame_id = frame_id
 
         trees.header.stamp = time
 
@@ -293,7 +297,7 @@ class treeMapper(Node):
 
     def publish_circle(self, x, y, r) -> None:
         tree = PoseStamped()
-        tree.header.frame_id = "map"
+        tree.header.frame_id = self.most_recent_frame_id
         tree.header.stamp = self.most_recent_time
         tree.pose.position.x = float(x)
         tree.pose.position.y = float(y)

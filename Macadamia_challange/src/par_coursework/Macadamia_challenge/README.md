@@ -130,8 +130,9 @@ ros2 launch macadamia_challenge macadamia_challange.launch.py \
 | `tree_mapper_min_radius` | `0.05` | Minimum detected contour radius in metres. |
 | `tree_mapper_max_radius` | `0.5` | Maximum detected contour radius in metres. |
 | `spiral_min_radius` | `0.25` | Starting spiral radius around a tree. |
-| `spiral_max_radius` | `1.4` | Radius where spiral behaviour finishes. |
+| `spiral_max_radius` | `0.0` | Tree-spacing adjustment for the spiral finish radius. `0.0` uses half the average distance to neighbouring trees, positive values add overlap between neighbouring spirals, and negative values leave a gap. |
 | `spiral_loop_spacing` | `1.0` | Spiral loop spacing in robot-width units. |
+| `spiral_shape` | `round` | Spiral shape: `round` for circular spiral, `square` for squared-off spiral. |
 | `spiral_mode` | `steering` | Spiral implementation: `steering` for direct `/cmd_vel`, or `nav2` for Nav2 waypoint batches. |
 | `spiral_linear_speed` | `0.125` | Linear speed during spiral steering. |
 | `spiral_kp_heading` | `1.5` | Heading proportional gain for spiral steering. |

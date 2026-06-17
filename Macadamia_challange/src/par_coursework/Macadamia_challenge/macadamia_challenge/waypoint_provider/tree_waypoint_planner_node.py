@@ -13,7 +13,7 @@ class TreeWaypointPlanner(Node):
     def __init__(self):
         super().__init__('tree_waypoint_planner')
 
-        self.declare_parameter('frame_id', 'odom')
+        self.declare_parameter('frame_id', 'map')
         self.declare_parameter('use_hardcoded_trees', True)
         self.declare_parameter('waypoint_mode', 'towards_centerline')
         self.declare_parameter('waypoint_offset_x', 0.0)

@@ -22,7 +22,7 @@ class TreeMemory(Node):
     def __init__(self):
         super().__init__('tree_memory_node')
 
-        self.declare_parameter('frame_id', 'odom')
+        self.declare_parameter('frame_id', 'map')
         self.declare_parameter('merge_distance', 0.4)
         self.declare_parameter('smoothing_alpha', 0.5)
         self.declare_parameter('min_observations', 1)
