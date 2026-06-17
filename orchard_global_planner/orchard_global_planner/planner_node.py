@@ -235,9 +235,17 @@ class PlannerNode(Node):
         
         self.robot_radius = msg.data
 
+        self.get_logger().info(
+            f"Robot radius set to: {msg.data}"
+        )
+
     def safety_margin_callback(self, msg):
 
         self.safety_margin = msg.data
+
+        self.get_logger().info(
+            f"Safety margin set to: {msg.data}"
+        )
 
 
     def is_state_valid(self, state):
