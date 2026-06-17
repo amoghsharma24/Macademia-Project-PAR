@@ -218,6 +218,11 @@ class SpiralController(Node):
     def goal_response_callback(self, future):
         goal_handle = future.result()
 
+        if not self.started or self.finished:
+            if goal_handle.accepted:
+                goal_handle.cancel_goal_async()
+            return
+
         if not goal_handle.accepted:
             self.goal_active = False
             self.record_goal_rejection()
@@ -237,6 +242,9 @@ class SpiralController(Node):
         result = future.result()
         self.goal_active = False
         self.goal_handle = None
+
+        if not self.started or self.finished:
+            return
 
         if result.status == GoalStatus.STATUS_SUCCEEDED:
             self.consecutive_rejections = 0
@@ -287,6 +295,7 @@ class SpiralController(Node):
         self.started = False
         self.cancel_active_goal()
         self.stop_robot()
+        self.clear_current_goal_state()
         self.done_pub.publish(Empty())
         self.get_logger().info('Finished spiral path')
 
@@ -452,12 +461,19 @@ class SpiralController(Node):
             f'x={self.current_x:.3f}, y={self.current_y:.3f}, yaw={self.current_yaw:.3f}'
         )
 
+    def clear_current_goal_state(self):
+        self.current_goal_is_fallback = False
+        self.current_spiral_goal = None
+        self.current_batch = []
+        self.fallback_attempts = 0
+
     def stop_callback(self, _msg):
         was_started = self.started or self.goal_active
 
         self.started = False
         self.finished = False
         self.cancel_active_goal()
+        self.clear_current_goal_state()
 
         if was_started:
             self.get_logger().info('Spiral Nav2 waypoint movement stopped')

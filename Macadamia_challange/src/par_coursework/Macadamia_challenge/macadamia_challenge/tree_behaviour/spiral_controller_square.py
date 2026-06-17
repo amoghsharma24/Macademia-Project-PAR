@@ -32,7 +32,6 @@ class SpiralController(Node):
 
         self.current_loop = 0
         self.current_corner = 0
-        self.current_target = None
 
         self.cmd_pub = self.create_publisher(TwistStamped, '/cmd_vel', 10)
         self.marker_pub = self.create_publisher(Marker, '/spiral_markers', 10)
@@ -75,6 +74,10 @@ class SpiralController(Node):
             name='centre_point'
         )
 
+        self.current_x = None
+        self.current_y = None
+        self.current_yaw = None
+
         self.timer = self.create_timer(0.05, self.control_loop)
 
     def odom_callback(self, msg):
@@ -88,20 +91,20 @@ class SpiralController(Node):
         if not self.started:
             return
 
-        if self.current_x is None or self.current_y is None or self.current_yaw is None:
-            self.get_logger().warn('Waiting for odometry before running spiral', throttle_duration_sec=2.0)
+        radius = self.radius_for_loop(self.current_loop)
+
+        if radius > self.max_radius:
+            self.finish_spiral()
             return
 
-        if self.current_target is None:
-            if not self.set_next_target():
-                self.finish_spiral()
-                return
-
-        target_x, target_y = self.current_target
-        target_yaw = self.corner_yaw(self.current_corner)
+        target_x, target_y = self.corner_point(self.current_loop, self.current_corner)
 
         self.publish_marker(0, self.center_x, self.center_y, 0.0, 1.0, 0.0, 'centre_point')
         self.publish_marker(1, target_x, target_y, 1.0, 0.0, 0.0, 'target_point')
+
+        if self.current_x is None or self.current_y is None or self.current_yaw is None:
+            self.get_logger().warn('Waiting for odometry before running spiral', throttle_duration_sec=2.0)
+            return
 
         dx = target_x - self.current_x
         dy = target_y - self.current_y
@@ -122,30 +125,26 @@ class SpiralController(Node):
         cmd.twist.angular.z = self.kp_heading * heading_error
         cmd.twist.angular.z = max(min(cmd.twist.angular.z, 0.4), -0.4)
 
+        self.get_logger().info(
+            f'Target: x={target_x:.3f}, y={target_y:.3f}, radius={radius:.3f}, '
+            f'loop={self.current_loop}, corner={self.current_corner} | '
+            f'Pose: x={self.current_x:.3f}, y={self.current_y:.3f}, '
+            f'yaw={self.current_yaw:.3f} | '
+            f'Heading error={heading_error:.3f}, distance={distance_error:.3f}, '
+            f'linear={cmd.twist.linear.x:.3f}, angular={cmd.twist.angular.z:.3f}',
+            throttle_duration_sec=1.0
+        )
+
         self.cmd_pub.publish(cmd)
 
         if distance_error < 0.15:
             self.advance_target()
-
-    def set_next_target(self):
-        radius = self.radius_for_loop(self.current_loop)
-        if radius > self.max_radius:
-            return False
-
-        self.current_target = self.corner_point(self.current_loop, self.current_corner)
-        return True
 
     def advance_target(self):
         self.current_corner += 1
         if self.current_corner >= 4:
             self.current_corner = 0
             self.current_loop += 1
-
-        if self.radius_for_loop(self.current_loop) > self.max_radius:
-            self.finish_spiral()
-            return
-
-        self.current_target = self.corner_point(self.current_loop, self.current_corner)
 
     def stop_robot(self):
         cmd = TwistStamped()
@@ -223,7 +222,6 @@ class SpiralController(Node):
 
         self.current_loop = 0
         self.current_corner = 0
-        self.current_target = None
         self.started = True
         self.finished = False
 
