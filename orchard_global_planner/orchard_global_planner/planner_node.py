@@ -233,11 +233,11 @@ class PlannerNode(Node):
     
     def robot_radius_callback(self, msg):
         
-        self.robot_radius = msg.data.strip()
+        self.robot_radius = msg.data
 
     def safety_margin_callback(self, msg):
 
-        self.safety_margin = msg.data.strip()
+        self.safety_margin = msg.data
 
 
     def is_state_valid(self, state):
