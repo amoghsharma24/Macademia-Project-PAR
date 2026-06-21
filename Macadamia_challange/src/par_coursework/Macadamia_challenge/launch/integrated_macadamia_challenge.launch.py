@@ -9,7 +9,7 @@ def generate_launch_description():
     return LaunchDescription(
         [
             # region launch arguments
-            DeclareLaunchArgument("frame_id", default_value="odom"),
+            DeclareLaunchArgument("frame_id", default_value="map"),
             DeclareLaunchArgument("use_fake_trees", default_value="false"),
             DeclareLaunchArgument("use_tree_mapper", default_value="true"),
             DeclareLaunchArgument("use_boundary_filter", default_value="true"),
@@ -181,6 +181,17 @@ def generate_launch_description():
             # ),
             Node(
                 package="macadamia_challenge",
+                executable="nav2_path_sender_node",
+                name="nav2_path_sender",
+                output="screen",
+                condition=IfCondition(LaunchConfiguration("use_nav2_sender")),
+                parameters=[
+                    {"auto_send": LaunchConfiguration("nav2_auto_send")},
+                    {"start_active": LaunchConfiguration("nav2_start_active")},
+                ],
+            ),
+            Node(
+                package="macadamia_challenge",
                 executable="orchard_control_node",
                 name="orchard_control_node",
                 output="screen",
@@ -254,23 +265,5 @@ def generate_launch_description():
                     {"batch_size": LaunchConfiguration("spiral_nav2_batch_size")},
                 ],
             ),
-            
-            # Node(
-            #     package="macadamia_challenge",
-            #     executable="navigator_node",
-            #     name="navigator_node",
-            #     output="screen",
-            #     parameters=[
-            #     ],
-            # ),
-            # Node(
-            #     package="macadamia_challenge",
-            #     executable="planner_node",
-            #     name="planner_node",
-            #     output="screen",
-            #     parameters=[
-            #     ],
-            # ),
-            # endregion
         ]
     )

@@ -28,7 +28,8 @@ setup(
             'fake_boundary_filter_node = macadamia_challenge.waypoint_provider.fake_boundary_filter_node:main',
             'tree_memory_node = macadamia_challenge.waypoint_provider.tree_memory_node:main',
             'tree_waypoint_planner_node = macadamia_challenge.waypoint_provider.tree_waypoint_planner_node:main',
-            'nav2_waypoint_sender_node = macadamia_challenge.waypoint_provider.nav2_waypoint_sender_node:main',
+            # 'nav2_waypoint_sender_node = macadamia_challenge.waypoint_provider.nav2_waypoint_sender_node:main',
+            'path_sender_node = macadamia_challenge.path_navigator.nav2_path_sender_node:main',
             'orchard_control_node = macadamia_challenge.controll.orchard_state_controller:main',
             'orchard_control_node_direct_neighbours = macadamia_challenge.controll.orchard_state_controller_direct_neighbours:main',
             'orchard_control_node_two_closest = macadamia_challenge.controll.orchard_state_controller_two_closest:main',
@@ -37,7 +38,6 @@ setup(
             'spiral_nav2_controller = macadamia_challenge.tree_behaviour.spiral_controller_nav2_waypoint:main',
             'spiral_nav2_controller_square = macadamia_challenge.tree_behaviour.spiral_controller_nav2_waypoint_square:main',
             'tree_mapper_node = macadamia_challenge.tree_detection.tree_mapper_node:main',
-            'navigator_node = macadamia_challenge.path_navigator.navigator_node:main',
         ],
     },
 )
