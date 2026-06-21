@@ -61,7 +61,7 @@ class PlannerNode(Node):
 
         self.controller_sub = self.create_subscription(
             PoseStamped, 
-            '/next_pose',
+            '/selected_tree_waypoint',
             self.goal_callback,
             10
         )
