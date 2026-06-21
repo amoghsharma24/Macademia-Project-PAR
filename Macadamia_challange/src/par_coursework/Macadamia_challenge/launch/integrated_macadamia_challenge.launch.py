@@ -28,9 +28,9 @@ def generate_launch_description():
             DeclareLaunchArgument("centreline_y", default_value="0.0"),
             DeclareLaunchArgument("approach_distance", default_value="0.6"),
             DeclareLaunchArgument("min_x", default_value="0.0"),
-            DeclareLaunchArgument("max_x", default_value="5.0"),
-            DeclareLaunchArgument("min_y", default_value="-2.5"),
-            DeclareLaunchArgument("max_y", default_value="2.5"),
+            DeclareLaunchArgument("max_x", default_value="3.0"),
+            DeclareLaunchArgument("min_y", default_value="-1.0"),
+            DeclareLaunchArgument("max_y", default_value="1.0"),
             DeclareLaunchArgument("outside_value", default_value="0"),
             DeclareLaunchArgument("tree_mapper_input_map_topic", default_value="/filtered_map"),
             DeclareLaunchArgument(
