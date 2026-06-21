@@ -82,22 +82,28 @@ class NavigatorNode(Node):
         self.get_logger().info(
             f"Nav2 finished with status: {status}"
         )
+
+        if hasattr(result, "error_code"):
+            self.get_logger().info(
+                f"Nav2 result error_code: {result.error_code}"
+            )
+
+        if hasattr(result, "error_msg") and result.error_msg:
+            self.get_logger().warn(
+                f"Nav2 result error_msg: {result.error_msg}"
+            )
         
-        if result.status == GoalStatus.STATUS_SUCCEEDED:
+        if status == GoalStatus.STATUS_SUCCEEDED:
             self.publish_status('goal succeeded')
             reached = Bool()
             reached.data = True
             self.reached_pub.publish(reached)
-            return
         else:
             self.publish_status('goal failed')
 
         self.goal_sent = False
 
     def publish_status(self, text):
-        if not self.active and text != 'stopped':
-            return
-
         msg = String()
         msg.data = text
         self.status_pub.publish(msg)
