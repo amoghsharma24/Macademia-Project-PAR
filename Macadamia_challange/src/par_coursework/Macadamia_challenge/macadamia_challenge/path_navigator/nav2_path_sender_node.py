@@ -124,7 +124,7 @@ def main(args=None):
 
     rclpy.init(args=args)
 
-    node = NavigatorNode()
+    node = Nav2PathSenderNode()
 
     rclpy.spin(node)
 
