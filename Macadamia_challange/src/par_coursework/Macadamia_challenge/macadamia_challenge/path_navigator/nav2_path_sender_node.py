@@ -1,3 +1,12 @@
+import rclpy
+from rclpy.node import Node
+from rclpy.action import ActionClient
+
+from nav_msgs.msg import Path
+from nav2_msgs.action import NavigateThroughPoses
+from std_msgs.msg import String, Bool, Empty
+from action_msgs.msg import GoalStatus
+
 class Nav2PathSenderNode(Node):
 
     def __init__(self):
@@ -105,3 +114,24 @@ class Nav2PathSenderNode(Node):
             self.publish_status('goal_failed')
 
         self.goal_sent = False
+    
+    def publish_status(self, text):
+        msg = String()
+        msg.data = text
+        self.status_pub.publish(msg)
+
+def main(args=None):
+
+    rclpy.init(args=args)
+
+    node = NavigatorNode()
+
+    rclpy.spin(node)
+
+    node.destroy_node()
+
+    rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    main()

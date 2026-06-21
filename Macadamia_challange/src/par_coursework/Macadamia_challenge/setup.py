@@ -29,7 +29,7 @@ setup(
             'tree_memory_node = macadamia_challenge.waypoint_provider.tree_memory_node:main',
             'tree_waypoint_planner_node = macadamia_challenge.waypoint_provider.tree_waypoint_planner_node:main',
             # 'nav2_waypoint_sender_node = macadamia_challenge.waypoint_provider.nav2_waypoint_sender_node:main',
-            'path_sender_node = macadamia_challenge.path_navigator.nav2_path_sender_node:main',
+            'nav2_path_sender_node = macadamia_challenge.path_navigator.nav2_path_sender_node:main',
             'orchard_control_node = macadamia_challenge.controll.orchard_state_controller:main',
             'orchard_control_node_direct_neighbours = macadamia_challenge.controll.orchard_state_controller_direct_neighbours:main',
             'orchard_control_node_two_closest = macadamia_challenge.controll.orchard_state_controller_two_closest:main',
