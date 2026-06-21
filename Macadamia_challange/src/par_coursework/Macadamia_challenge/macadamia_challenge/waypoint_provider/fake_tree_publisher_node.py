@@ -9,7 +9,7 @@ class FakeTreePublisher(Node):
     def __init__(self):
         super().__init__('fake_tree_publisher')
 
-        self.declare_parameter('frame_id', 'odom')
+        self.declare_parameter('frame_id', 'map')
         self.publisher = self.create_publisher(PoseArray, '/detected_trees', 10)
         self.create_timer(1.0, self.publish_fake_trees)
 

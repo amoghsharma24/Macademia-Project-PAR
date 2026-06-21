@@ -10,7 +10,7 @@ from std_msgs.msg import Empty, Float32MultiArray
 
 class SpiralController(Node):
     def __init__(self):
-        super().__init__('spiral_controller')
+        super().__init__('spiral_controller_square')
 
         self.declare_parameter('center_x', 0.5)
         self.declare_parameter('center_y', 0.0)
@@ -29,6 +29,9 @@ class SpiralController(Node):
         self.robot_width = self.get_parameter('robot_width').value
         self.linear_speed = self.get_parameter('linear_speed').value
         self.kp_heading = self.get_parameter('kp_heading').value
+
+        self.current_loop = 0
+        self.current_corner = 0
 
         self.cmd_pub = self.create_publisher(TwistStamped, '/cmd_vel', 10)
         self.marker_pub = self.create_publisher(Marker, '/spiral_markers', 10)
@@ -58,7 +61,7 @@ class SpiralController(Node):
         )
 
         self.get_logger().info(
-            f'Spiral centre set to: x={self.center_x:.3f}, y={self.center_y:.3f}'
+            f'Square spiral centre set to: x={self.center_x:.3f}, y={self.center_y:.3f}'
         )
 
         self.publish_marker(
@@ -71,9 +74,6 @@ class SpiralController(Node):
             name='centre_point'
         )
 
-        self.k = self.spiral_growth_rate()
-
-        self.theta = 0.0
         self.current_x = None
         self.current_y = None
         self.current_yaw = None
@@ -91,14 +91,13 @@ class SpiralController(Node):
         if not self.started:
             return
 
-        radius = self.min_radius + self.k * self.theta
+        radius = self.radius_for_loop(self.current_loop)
 
         if radius > self.max_radius:
             self.finish_spiral()
             return
 
-        target_x = self.center_x + radius * math.cos(self.theta)
-        target_y = self.center_y + radius * math.sin(self.theta)
+        target_x, target_y = self.corner_point(self.current_loop, self.current_corner)
 
         self.publish_marker(0, self.center_x, self.center_y, 0.0, 1.0, 0.0, 'centre_point')
         self.publish_marker(1, target_x, target_y, 1.0, 0.0, 0.0, 'target_point')
@@ -128,7 +127,7 @@ class SpiralController(Node):
 
         self.get_logger().info(
             f'Target: x={target_x:.3f}, y={target_y:.3f}, radius={radius:.3f}, '
-            f'theta={self.theta:.3f} | '
+            f'loop={self.current_loop}, corner={self.current_corner} | '
             f'Pose: x={self.current_x:.3f}, y={self.current_y:.3f}, '
             f'yaw={self.current_yaw:.3f} | '
             f'Heading error={heading_error:.3f}, distance={distance_error:.3f}, '
@@ -139,7 +138,13 @@ class SpiralController(Node):
         self.cmd_pub.publish(cmd)
 
         if distance_error < 0.15:
-            self.theta += 0.04
+            self.advance_target()
+
+    def advance_target(self):
+        self.current_corner += 1
+        if self.current_corner >= 4:
+            self.current_corner = 0
+            self.current_loop += 1
 
     def stop_robot(self):
         cmd = TwistStamped()
@@ -155,7 +160,7 @@ class SpiralController(Node):
         self.started = False
         self.stop_robot()
         self.done_pub.publish(Empty())
-        self.get_logger().info('Finished spiral path')
+        self.get_logger().info('Finished square spiral path')
 
     def publish_marker(self, marker_id, x, y, r, g, b, name):
         marker = Marker()
@@ -170,7 +175,6 @@ class SpiralController(Node):
         marker.pose.position.x = float(x)
         marker.pose.position.y = float(y)
         marker.pose.position.z = 0.1
-
         marker.pose.orientation.w = 1.0
 
         marker.scale.x = 0.25
@@ -215,13 +219,13 @@ class SpiralController(Node):
         self.min_radius = float(min_radius)
         self.max_radius = float(max_radius)
         self.loop_spacing = float(loop_spacing)
-        self.k = self.spiral_growth_rate()
 
+        self.current_loop = 0
+        self.current_corner = 0
         self.started = True
         self.finished = False
-        self.theta = 0.0
 
-        self.get_logger().info('Spiral movement started')
+        self.get_logger().info('Square spiral movement started')
         self.get_logger().info(
             f'Spiral settings from start message: centre x={self.center_x:.3f}, '
             f'y={self.center_y:.3f}, min_radius={self.min_radius:.3f}, '
@@ -240,14 +244,34 @@ class SpiralController(Node):
         self.finished = False
 
         if was_started:
-            self.get_logger().info('Spiral movement stopped')
+            self.get_logger().info('Square spiral movement stopped')
             self.stop_robot()
 
     def loop_spacing_metres(self):
         return self.loop_spacing * self.robot_width
 
-    def spiral_growth_rate(self):
-        return self.loop_spacing_metres() / (2.0 * math.pi)
+    def radius_for_loop(self, loop_index):
+        return self.min_radius + loop_index * self.loop_spacing_metres()
+
+    def corner_point(self, loop_index, corner_index):
+        radius = self.radius_for_loop(loop_index)
+        if corner_index == 0:
+            return self.center_x + radius, self.center_y + radius
+        if corner_index == 1:
+            return self.center_x - radius, self.center_y + radius
+        if corner_index == 2:
+            return self.center_x - radius, self.center_y - radius
+        return self.center_x + radius, self.center_y - radius
+
+    @staticmethod
+    def corner_yaw(corner_index):
+        if corner_index == 0:
+            return math.pi
+        if corner_index == 1:
+            return -math.pi / 2.0
+        if corner_index == 2:
+            return 0.0
+        return math.pi / 2.0
 
     @staticmethod
     def quaternion_to_yaw(q):

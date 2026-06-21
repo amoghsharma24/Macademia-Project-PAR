@@ -62,7 +62,7 @@ class NavigatorNode(Node):
 
     def goal_response_callback(self, future):
 
-        goal_handle = future.result()
+        goal_handle = future.result().result
 
         if not goal_handle.accepted:
             self.get_logger().error("Nav2 goal rejected")
