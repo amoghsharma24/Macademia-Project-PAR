@@ -23,9 +23,9 @@ def generate_launch_description():
 
             # fake_boundary_filter_node arguments
             DeclareLaunchArgument("min_x", default_value="0.0"),
-            DeclareLaunchArgument("max_x", default_value="5.0"),
-            DeclareLaunchArgument("min_y", default_value="-2.5"),
-            DeclareLaunchArgument("max_y", default_value="2.5"),
+            DeclareLaunchArgument("max_x", default_value="3.0"),
+            DeclareLaunchArgument("min_y", default_value="-1.0"),
+            DeclareLaunchArgument("max_y", default_value="1.0"),
             DeclareLaunchArgument("outside_value", default_value="0"),
 
             # tree_mapper_node arguments
@@ -89,8 +89,8 @@ def generate_launch_description():
 
             # spiral tree-behaviour arguments
             DeclareLaunchArgument("spiral_min_radius", default_value="0.25"),
-            DeclareLaunchArgument("spiral_max_radius", default_value="0.0"),
-            DeclareLaunchArgument("spiral_loop_spacing", default_value="1.0"),
+            DeclareLaunchArgument("spiral_max_radius", default_value="0.5"),
+            DeclareLaunchArgument("spiral_loop_spacing", default_value="0.1"),
             DeclareLaunchArgument("spiral_shape", default_value="round"),
             DeclareLaunchArgument("spiral_mode", default_value="steering"),
             DeclareLaunchArgument("spiral_linear_speed", default_value="0.125"),
